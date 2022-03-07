@@ -31,22 +31,20 @@ with open("VERSION") as f:
 with open("requirements.txt") as f:
     required = f.read().splitlines()
 
-# Modify this to be the name of your plugin file
-plugins_list = ["custom = custom"]
+plugins_list = ["awsbatch = covalent_awsbatch_plugin.awsbatch"]
 
 setup_info = {
-    # Your plugin should use the naming convention 'covalent-abcdef-plugin'
-    "name": "covalent-executor-template",
+    "name": "covalent-awsbatch-plugin",
     "packages": find_packages("."),
     "version": version,
     # Modify any contact information as you see fit
     "maintainer": "Agnostiq",
-    "url": "https://github.com/AgnostiqHQ/covalent-executor-template",
-    "download_url": f"https://github.com/AgnostiqHQ/covalent-executor-template/archive/v{version}.tar.gz",
+    "url": "https://github.com/AgnostiqHQ/covalent-awsbatch-plugin",
+    "download_url": f"https://github.com/AgnostiqHQ/covalent-awsbatch-plugin/archive/v{version}.tar.gz",
     "license": "GNU Affero GPL v3.0",
     "author": "Agnostiq",
     "author_email": "support@agnostiq.ai",
-    "description": "Covalent Custom Executor Plugin",
+    "description": "Covalent AWS Batch Plugin",
     "long_description": open("README.md").read(),
     "long_description_content_type": "text/markdown",
     "include_package_data": True,
