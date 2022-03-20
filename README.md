@@ -11,7 +11,66 @@
 
 ## Covalent AWS Batch Plugin
 
-Covalent is a Pythonic workflow tool used to execute tasks on advanced computing hardware. 
+Covalent is a Pythonic workflow tool used to execute tasks on advanced computing hardware. This executor plugin interfaces Covalent with [AWS Batch](https://docs.aws.amazon.com/batch/). In order for workflows to be deployable, users must have AWS credentials attached to the [CovalentBatchExecutorPolicy](https://github.com/AgnostiqHQ/covalent-awsbatch-plugin/infra/iam/CovalentBatchExecutorPolicy.json). Users will need additional permissions to provision or manage cloud infrastructure used by this plugin.
+
+To use this plugin with Covalent, clone this repository and install it using `pip`:
+
+```
+git clone git@github.com:AgnostiqHQ/covalent-awsbatch-plugin.git
+cd covalent-awsbatch-plugin
+pip install .
+```
+
+Users must add the correct entries to their Covalent [configuration](https://covalent.readthedocs.io/en/latest/how_to/config/customization.html) to support the AWS Batch plugin. Below is an example which works using some basic infrastructure created for testing purposes:
+
+```console
+[executors.awsbatch]
+credentials = "/home/user/.aws/credentials"
+profile = ""
+s3_bucket_name = "covalent-batch-job-resources"
+ecr_repo_name = "covalent-batch-job-images"
+batch_job_definition_name = "covalent-batch-jobs"
+batch_queue = "covalent-batch-queue"
+batch_execution_role_name = "ecsTaskExecutionRole"
+batch_job_role_name = "CovalentBatchJobRole"
+batch_job_log_group_name = "covalent-batch-job-logs"
+vcpu = 2
+memory = 3.75
+num_gpus = 0
+retry_attempts = 3
+time_limit = 300
+cache_dir = "/tmp/covalent"
+poll_freq = 10
+```
+
+In the test infrastructure, jobs can run on any instance in the c4 family. If GPUs are required, other instance families should be configured in the compute environment used by the batch queue.
+
+Within a workflow, users can decorate electrons using these default settings:
+
+```python
+import covalent as ct
+
+@ct.electron(executor="fargate")
+def my_task(x, y):
+    return x + y
+```
+
+or use a class object to customize the resources and other behavior:
+
+```python
+# Request 16 vCPUs and 1GB memory per thread, with a 10-minute time limit.
+executor = ct.executor.AWSBatchExecutor(
+    vcpu=16,
+    memory=16,
+    time_limit = 600
+)
+
+@ct.electron(executor=executor)
+def my_custom_task(x, y):
+    return x + y
+```
+
+For more information about how to get started with Covalent, check out the project [homepage](https://github.com/AgnostiqHQ/covalent) and the official [documentation](https://covalent.readthedocs.io/en/latest/).
 
 ## Release Notes
 
