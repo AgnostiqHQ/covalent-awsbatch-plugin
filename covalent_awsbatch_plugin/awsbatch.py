@@ -74,7 +74,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "poll_freq": 10,
 }
 
-executor_plugin_name = "AWSBatchExecutor"
+EXECUTOR_PLUGIN_NAME = "AWSBatchExecutor"
 
 
 class AWSBatchExecutor(BaseExecutor):
