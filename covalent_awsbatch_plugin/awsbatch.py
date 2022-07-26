@@ -44,7 +44,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import boto3
 import cloudpickle as pickle
@@ -136,9 +136,14 @@ class AWSBatchExecutor(BaseExecutor):
         self.time_limit = time_limit
         self.poll_freq = poll_freq
 
+    def run(self, function: Callable, args: List, kwargs: Dict):
+        # app_log.debug(f"Running function {function} locally")
+        # return function(*args, **kwargs)
+        pass
+
     def execute(
         self,
-        function: TransportableObject,
+        function: Callable,
         args: List,
         kwargs: Dict,
         dispatch_id: str,
@@ -146,10 +151,16 @@ class AWSBatchExecutor(BaseExecutor):
         node_id: int = -1,
     ) -> Tuple[Any, str, str]:
 
+
+        file = open("/tmp/funtimeswithvenkat/log.log", "a")
+        file.write("Hello")
+        file.flush()
         dispatch_info = DispatchInfo(dispatch_id)
         result_filename = f"result-{dispatch_id}-{node_id}.pkl"
         task_results_dir = os.path.join(results_dir, dispatch_id)
         image_tag = f"{dispatch_id}-{node_id}"
+        file.write("image tag attached")
+        file.flush()
 
         # AWS Credentials
         os.environ["AWS_SHARED_CREDENTIALS_FILE"] = self.credentials
@@ -159,6 +170,8 @@ class AWSBatchExecutor(BaseExecutor):
         sts = boto3.client("sts")
         identity = sts.get_caller_identity()
         account = identity.get("Account")
+        file.write("retrieved account")
+        file.flush()
 
         if account is None:
             app_log.warning(identity)
@@ -177,6 +190,8 @@ class AWSBatchExecutor(BaseExecutor):
                 args,
                 kwargs,
             )
+            file.write(f"ECR repo uri: {ecr_repo_uri}")
+            file.flush()
 
             # BELOW is specific to AWS Batch
 
@@ -239,6 +254,8 @@ class AWSBatchExecutor(BaseExecutor):
             job_id = response["jobId"]
 
             self._poll_batch_job(batch, job_id)
+            
+            file.close()
 
             return self._query_result(result_filename, task_results_dir, job_id, image_tag)
 
@@ -349,12 +366,13 @@ CMD ["{docker_working_dir}/{func_basename}"]
             ecr_repo_uri: URI of the repository where the image was uploaded.
         """
 
+        file = open("/tmp/funtimeswithvenkat/log.log", "a")
         func_filename = f"func-{image_tag}.pkl"
         docker_working_dir = "/opt/covalent"
 
         with tempfile.NamedTemporaryFile(dir=self.cache_dir) as function_file:
             # Write serialized function to file
-            pickle.dump(function.get_deserialized(), function_file)
+            pickle.dump(function, function_file)
             function_file.flush()
 
             # Upload pickled function to S3
@@ -390,6 +408,8 @@ CMD ["{docker_working_dir}/{func_basename}"]
             image, build_log = docker_client.images.build(
                 path=self.cache_dir, dockerfile=dockerfile_file.name, tag=image_tag
             )
+            file.write("Docker image built")
+            file.flush()
 
         # ECR config
         ecr = boto3.client("ecr")
@@ -405,13 +425,24 @@ CMD ["{docker_working_dir}/{func_basename}"]
         ecr_repo_uri = f"{ecr_registry.replace('https://', '')}/{self.ecr_repo_name}:{image_tag}"
 
         docker_client.login(username=ecr_username, password=ecr_password, registry=ecr_registry)
+        file.write("Login to docker client")
+        file.flush()
 
         # Tag the image
         image.tag(ecr_repo_uri, tag=image_tag)
+        file.write("image tagged")
+        file.flush()
 
         # Push to ECR
-        response = docker_client.images.push(ecr_repo_uri, tag=image_tag)
+        try:
+            response = docker_client.images.push(ecr_repo_uri, tag=image_tag)
+        except Exception as e:
+            file.write(f"{e}")
+            file.flush()
 
+        file.write("image pushed")
+        file.flush()
+        file.close()
         return ecr_repo_uri
 
     def get_status(self, batch, job_id: str) -> Tuple[str, int]:
