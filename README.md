@@ -2,10 +2,7 @@
 
 <div align="center">
 
-![covalent logo](https://github.com/AgnostiqHQ/covalent/blob/master/doc/source/_static/dark.png#gh-dark-mode-only)
-![covalent logo](https://github.com/AgnostiqHQ/covalent/blob/master/doc/source/_static/light.png#gh-light-mode-only)
-
-&nbsp;
+<img src="https://github.com/AgnostiqHQ/covalent-awsbatch-plugin/blob/main/doc/source/_static/aws_batch_readme_banner.jpg" width=150%>
 
 </div>
 
