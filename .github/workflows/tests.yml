@@ -69,7 +69,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --no-cache-dir -r ./requirements.txt
-          pip install --no-cache-dir -r ./tests/requirements.txt
+          pip install --no-cache-dir -r /tests/requirements.txt
       
       - name: Build distribution
         run: python setup.py sdist
@@ -78,7 +78,7 @@ jobs:
         run: pip install covalent
                
       - name: Run tests
-        run: PYTHONPATH=$PWD/ pytest tests/ -vv --cov=covalent_awsbatch_plugin
+        run: PYTHONPATH=$PWD/ pytest tests/ -vv --cov=./covalent_awsbatch_plugin
 
       - name: Push to main
         id: push
