@@ -78,7 +78,7 @@ jobs:
         run: pip install covalent
                
       - name: Run tests
-        run: PYTHONPATH=$PWD/ pytest tests/ -vv --cov=covalent_awsbatch_plugin
+        run: PYTHONPATH=$PWD/ pytest tests/ -vv --cov=./covalent_awsbatch_plugin
 
       - name: Push to main
         id: push
