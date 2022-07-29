@@ -464,7 +464,6 @@ CMD ["{docker_working_dir}/{func_basename}"]
         app_log.debug(f"AWS BATCH EXECUTOR: JOB STATUS SUCCESS {status}.")
         try:
             exit_code = int(job["jobs"][0]["container"]["exitCode"])
-        # except KeyError:
         except Exception as e:
             exit_code = -1
         app_log.debug(f"AWS BATCH EXECUTOR: STATUS AND EXIT CODE SUCCESS {status, exit_code}.")
