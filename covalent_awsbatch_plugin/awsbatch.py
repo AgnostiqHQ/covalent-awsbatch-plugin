@@ -138,8 +138,6 @@ class AWSBatchExecutor(BaseExecutor):
         self.poll_freq = poll_freq
 
     def run(self, function: Callable, args: List, kwargs: Dict):
-        # app_log.debug(f"Running function {function} locally")
-        # return function(*args, **kwargs)
         pass
 
     def execute(
