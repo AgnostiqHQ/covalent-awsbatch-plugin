@@ -40,11 +40,12 @@
 
 import base64
 import os
+
 import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import boto3
 import cloudpickle as pickle
@@ -136,9 +137,12 @@ class AWSBatchExecutor(BaseExecutor):
         self.time_limit = time_limit
         self.poll_freq = poll_freq
 
+    def run(self, function: Callable, args: List, kwargs: Dict):
+        pass
+
     def execute(
         self,
-        function: TransportableObject,
+        function: Callable,
         args: List,
         kwargs: Dict,
         dispatch_id: str,
@@ -146,19 +150,23 @@ class AWSBatchExecutor(BaseExecutor):
         node_id: int = -1,
     ) -> Tuple[Any, str, str]:
 
+        app_log.debug("AWS BATCH EXECUTOR: INSIDE EXECUTE METHOD")
         dispatch_info = DispatchInfo(dispatch_id)
         result_filename = f"result-{dispatch_id}-{node_id}.pkl"
         task_results_dir = os.path.join(results_dir, dispatch_id)
         image_tag = f"{dispatch_id}-{node_id}"
+        app_log.debug("AWS BATCH EXECUTOR: IMAGE TAG CONSTRUCTED")
 
         # AWS Credentials
         os.environ["AWS_SHARED_CREDENTIALS_FILE"] = self.credentials
         os.environ["AWS_PROFILE"] = self.profile
+        app_log.debug("AWS BATCH EXECUTOR: GET CREDENTIALS AND PROFILE SUCCESS")
 
         # AWS Account Retrieval
         sts = boto3.client("sts")
         identity = sts.get_caller_identity()
         account = identity.get("Account")
+        app_log.debug("AWS BATCH EXECUTOR: GET ACCOUNT SUCCESS")
 
         if account is None:
             app_log.warning(identity)
@@ -177,6 +185,8 @@ class AWSBatchExecutor(BaseExecutor):
                 args,
                 kwargs,
             )
+            app_log.debug("AWS BATCH EXECUTOR: PACKAGE AND UPLOAD SUCCESS")
+            app_log.debug(f"AWS BATCH EXECUTOR: ECR REPO URI SUCCESS ({ecr_repo_uri})")
 
             # BELOW is specific to AWS Batch
 
@@ -201,6 +211,8 @@ class AWSBatchExecutor(BaseExecutor):
                         "value": str(self.num_gpus),
                     },
                 ]
+
+            app_log.debug("AWS BATCH EXECUTOR: BOTO CLIENT INIT SUCCESS")                
 
             batch.register_job_definition(
                 jobDefinitionName=self.batch_job_definition_name,
@@ -229,6 +241,8 @@ class AWSBatchExecutor(BaseExecutor):
                 platformCapabilities=["EC2"],
             )
 
+            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB DEFINITION REGISTRY SUCCESS")                
+
             # Submit the job
             response = batch.submit_job(
                 jobName=f"covalent-batch-{dispatch_id}-{node_id}",
@@ -236,9 +250,13 @@ class AWSBatchExecutor(BaseExecutor):
                 jobDefinition=self.batch_job_definition_name,
             )
 
+            app_log.debug("AWS BATCH EXECUTOR: JOB SUBMISSION SUCCESS")                
+
             job_id = response["jobId"]
+            app_log.debug(f"AWS BATCH EXECUTOR: JOB ID {job_id}")                
 
             self._poll_batch_job(batch, job_id)
+            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB POLL SUCCESS")                
 
             return self._query_result(result_filename, task_results_dir, job_id, image_tag)
 
@@ -263,6 +281,7 @@ class AWSBatchExecutor(BaseExecutor):
             script: String object containing the executable Python script.
         """
 
+        app_log.debug("AWS BATCH EXECUTOR: INSIDE FORMAT EXECSCRIPT METHOD")
         exec_script = """
 import os
 import boto3
@@ -275,9 +294,9 @@ s3 = boto3.client("s3")
 s3.download_file("{s3_bucket_name}", "{func_filename}", local_func_filename)
 
 with open(local_func_filename, "rb") as f:
-    function = pickle.load(f)
+    function, args, kwargs = pickle.load(f)
 
-result = function(*{args}, **{kwargs})
+result = function(*args, **kwargs)
 
 with open(local_result_filename, "wb") as f:
     pickle.dump(result, f)
@@ -305,13 +324,15 @@ s3.upload_file(local_result_filename, "{s3_bucket_name}", "{result_filename}")
             dockerfile: String object containing a Dockerfile.
         """
 
+        app_log.debug("AWS BATCH EXECUTOR: INSIDE FORMAT DOCKERFILE METHOD")
         dockerfile = """
-FROM python:3.8-slim-buster
+FROM amd64/python:3.8-slim-buster
 
 RUN apt-get update && apt-get install -y \\
   gcc \\
   && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir --use-feature=in-tree-build boto3 cloudpickle
+RUN pip install covalent --pre
 
 WORKDIR {docker_working_dir}
 
@@ -349,12 +370,13 @@ CMD ["{docker_working_dir}/{func_basename}"]
             ecr_repo_uri: URI of the repository where the image was uploaded.
         """
 
+        app_log.debug("AWS BATCH EXECUTOR: INSIDE PACKAGE AND UPLOAD METHOD")
         func_filename = f"func-{image_tag}.pkl"
         docker_working_dir = "/opt/covalent"
 
         with tempfile.NamedTemporaryFile(dir=self.cache_dir) as function_file:
             # Write serialized function to file
-            pickle.dump(function.get_deserialized(), function_file)
+            pickle.dump((function, args, kwargs), function_file)
             function_file.flush()
 
             # Upload pickled function to S3
@@ -366,6 +388,7 @@ CMD ["{docker_working_dir}/{func_basename}"]
         ) as exec_script_file, tempfile.NamedTemporaryFile(
             dir=self.cache_dir, mode="w"
         ) as dockerfile_file:
+
             # Write execution script to file
             exec_script = self._format_exec_script(
                 func_filename,
@@ -381,6 +404,7 @@ CMD ["{docker_working_dir}/{func_basename}"]
             dockerfile = self._format_dockerfile(exec_script_file.name, docker_working_dir)
             dockerfile_file.write(dockerfile)
             dockerfile_file.flush()
+            app_log.debug("AWS BATCH EXECUTOR: WRITE DOCKERFILE SUCCESS")
 
             local_dockerfile = os.path.join(task_results_dir, f"Dockerfile_{image_tag}")
             shutil.copyfile(dockerfile_file.name, local_dockerfile)
@@ -388,8 +412,9 @@ CMD ["{docker_working_dir}/{func_basename}"]
             # Build the Docker image
             docker_client = docker.from_env()
             image, build_log = docker_client.images.build(
-                path=self.cache_dir, dockerfile=dockerfile_file.name, tag=image_tag
+                path=self.cache_dir, dockerfile=dockerfile_file.name, tag=image_tag, platform="linux/amd64"
             )
+            app_log.debug("AWS BATCH EXECUTOR: DOCKER BUILD SUCCESS")
 
         # ECR config
         ecr = boto3.client("ecr")
@@ -404,14 +429,19 @@ CMD ["{docker_working_dir}/{func_basename}"]
         ecr_registry = ecr_credentials["proxyEndpoint"]
         ecr_repo_uri = f"{ecr_registry.replace('https://', '')}/{self.ecr_repo_name}:{image_tag}"
 
+        app_log.debug("AWS BATCH EXECUTOR: ECR CONFIG SUCCESS")
         docker_client.login(username=ecr_username, password=ecr_password, registry=ecr_registry)
+        app_log.debug("AWS BATCH EXECUTOR: DOCKER CLIENT LOGIN SUCCESS")
 
         # Tag the image
         image.tag(ecr_repo_uri, tag=image_tag)
+        app_log.debug("AWS BATCH EXECUTOR: IMAGE TAG SUCCESS")
 
-        # Push to ECR
-        response = docker_client.images.push(ecr_repo_uri, tag=image_tag)
-
+        try:
+            response = docker_client.images.push(ecr_repo_uri, tag=image_tag)
+        except Exception as e:
+            app_log.debug(f"{e}")
+        app_log.debug(f"AWS BATCH EXECUTOR: DOCKER IMAGE PUSH SUCCESS {response}")
         return ecr_repo_uri
 
     def get_status(self, batch, job_id: str) -> Tuple[str, int]:
@@ -426,12 +456,16 @@ CMD ["{docker_working_dir}/{func_basename}"]
             exit_code: Exit code, if the task has completed, else -1.
         """
 
+        app_log.debug("AWS BATCH EXECUTOR: INSIDE GET STATUS METHOD")
         job = batch.describe_jobs(jobs=[job_id])
+        app_log.debug(f"AWS BATCH EXECUTOR: DESCRIBE BATCH JOBS SUCCESS {job}.")
         status = job["jobs"][0]["status"]
+        app_log.debug(f"AWS BATCH EXECUTOR: JOB STATUS SUCCESS {status}.")
         try:
             exit_code = int(job["jobs"][0]["container"]["exitCode"])
-        except KeyError:
+        except Exception as e:
             exit_code = -1
+        app_log.debug(f"AWS BATCH EXECUTOR: STATUS AND EXIT CODE SUCCESS {status, exit_code}.")
 
         return status, exit_code
 
@@ -446,6 +480,7 @@ CMD ["{docker_working_dir}/{func_basename}"]
             None
         """
 
+        app_log.debug("AWS BATCH EXECUTOR: INSIDE POLL BATCH JOB METHOD")
         status, exit_code = self.get_status(batch, job_id)
 
         while status not in ["SUCCEEDED", "FAILED"]:
@@ -453,6 +488,7 @@ CMD ["{docker_working_dir}/{func_basename}"]
             status, exit_code = self.get_status(batch, job_id)
 
         if exit_code != 0:
+            app_log.debug(f"Job failed with exit code {exit_code}.")
             raise Exception(f"Job failed with exit code {exit_code}.")
 
     def _query_result(
@@ -476,6 +512,7 @@ CMD ["{docker_working_dir}/{func_basename}"]
             empty_string: A placeholder empty string.
         """
 
+        app_log.debug("AWS BATCH EXECUTOR: INSIDE QUERY RESULT METHOD")
         local_result_filename = os.path.join(task_results_dir, result_filename)
 
         s3 = boto3.client("s3")
@@ -516,5 +553,6 @@ CMD ["{docker_working_dir}/{func_basename}"]
             None
         """
 
+        app_log.debug("AWS BATCH EXECUTOR: INSIDE CANCEL METHOD")
         batch = boto3.client("batch")
         batch.terminate_job(jobId=job_id, reason=reason)
