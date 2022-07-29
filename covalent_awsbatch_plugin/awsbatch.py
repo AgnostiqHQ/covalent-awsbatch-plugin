@@ -296,7 +296,6 @@ s3.download_file("{s3_bucket_name}", "{func_filename}", local_func_filename)
 with open(local_func_filename, "rb") as f:
     function, args, kwargs = pickle.load(f)
 
-# result = function(*{args}, **{kwargs})
 result = function(*args, **kwargs)
 
 with open(local_result_filename, "wb") as f:
