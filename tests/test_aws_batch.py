@@ -20,6 +20,8 @@
 
 """Unit tests for AWS batch executor."""
 
+from typing import Dict, List
+
 import pytest
 
 from covalent_awsbatch_plugin.awsbatch import AWSBatchExecutor
@@ -45,10 +47,6 @@ def batch_executor():
         time_limit=0,
         poll_freq=0,
     )
-
-
-def test_run():
-    pass
 
 
 def test_execute():
@@ -85,8 +83,23 @@ def test_package_and_upload():
     pass
 
 
-def test_get_status():
-    pass
+def test_get_status(batch_executor):
+    """Test the get status method."""
+
+    class MockBatch:
+        def describe_jobs(self, jobs: List) -> Dict:
+            if jobs[0] == "1":
+                return {"jobs": [{"status": "SUCCESS", "container": {"exitCode": 1}}]}
+            elif jobs[0] == "2":
+                return {"jobs": [{"status": "RUNNING"}]}
+
+    status, exit_code = batch_executor.get_status(batch=MockBatch(), job_id="1")
+    assert status == "SUCCESS"
+    assert exit_code == 1
+
+    status, exit_code = batch_executor.get_status(batch=MockBatch(), job_id="2")
+    assert status == "RUNNING"
+    assert exit_code == -1
 
 
 def test_poll_batch_job_id():
