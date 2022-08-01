@@ -56,23 +56,29 @@ def test_execute():
 
 
 def test_format_exec_script(batch_executor):
-    """Test the function that constructs the executable tasks-execution Python script."""
+    """Test method that constructs the executable tasks-execution Python script."""
 
-    exec_script = batch_executor._format_exec_script(
-        func_filename="mock_function_filename",
-        result_filename="mock_result_filename",
-        docker_working_dir="mock_docker_working_dir",
-    )
+    kwargs = {
+        "func_filename": "mock_function_filename",
+        "result_filename": "mock_result_filename",
+        "docker_working_dir": "mock_docker_working_dir",
+    }
+    exec_script = batch_executor._format_exec_script(**kwargs)
     assert exec_script == PYTHON_EXEC_SCRIPT.format(
-        func_filename="mock_function_filename",
-        s3_bucket_name=batch_executor.s3_bucket_name,
-        result_filename="mock_result_filename",
-        docker_working_dir="mock_docker_working_dir",
+        s3_bucket_name=batch_executor.s3_bucket_name, **kwargs
     )
 
 
-def test_format_dockerfile():
-    pass
+def test_format_dockerfile(batch_executor):
+    """Test method that constructs the dockerfile."""
+
+    docker_script = batch_executor._format_dockerfile(
+        exec_script_filename="root/mock_exec_script_filename",
+        docker_working_dir="mock_docker_working_dir",
+    )
+    assert docker_script == DOCKER_SCRIPT.format(
+        func_basename="mock_exec_script_filename", docker_working_dir="mock_docker_working_dir"
+    )
 
 
 def test_package_and_upload():
