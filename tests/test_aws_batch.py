@@ -20,6 +20,76 @@
 
 """Unit tests for AWS batch executor."""
 
+import pytest
 
-def test_dummy():
+from covalent_awsbatch_plugin.awsbatch import AWSBatchExecutor
+from covalent_awsbatch_plugin.scripts import DOCKER_SCRIPT, PYTHON_EXEC_SCRIPT
+
+
+@pytest.fixture
+def batch_executor():
+    return AWSBatchExecutor(
+        credentials="mock_credentials",
+        profile="mock_profile",
+        s3_bucket_name="mock_s3_bucket_name",
+        ecr_repo_name="mock_ecr_repo_name",
+        batch_queue="mock_batch_queue",
+        batch_job_definition_name="mock_batch_job_definition_name",
+        batch_execution_role_name="mock_batch_execution_role_name",
+        batch_job_role_name="mock_batch_job_role_name",
+        batch_job_log_group_name="mock_batch_job_log_group_name",
+        vcpu=0,
+        memory=0.0,
+        num_gpus=0,
+        retry_attempts=0,
+        time_limit=0,
+        poll_freq=0,
+    )
+
+
+def test_run():
+    pass
+
+
+def test_execute():
+    pass
+
+
+def test_format_exec_script(batch_executor):
+    """Test the function that constructs the executable tasks-execution Python script."""
+
+    exec_script = batch_executor._format_exec_script(
+        func_filename="mock_function_filename",
+        result_filename="mock_result_filename",
+        docker_working_dir="mock_docker_working_dir",
+    )
+    assert exec_script == PYTHON_EXEC_SCRIPT.format(
+        func_filename="mock_function_filename",
+        s3_bucket_name=batch_executor.s3_bucket_name,
+        result_filename="mock_result_filename",
+        docker_working_dir="mock_docker_working_dir",
+    )
+
+
+def test_format_dockerfile():
+    pass
+
+
+def test_package_and_upload():
+    pass
+
+
+def test_get_status():
+    pass
+
+
+def test_poll_batch_job_id():
+    pass
+
+
+def test_query_results():
+    pass
+
+
+def test_cancel():
     pass

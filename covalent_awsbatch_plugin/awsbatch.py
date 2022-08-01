@@ -40,7 +40,6 @@
 
 import base64
 import os
-
 import shutil
 import tempfile
 import time
@@ -54,6 +53,8 @@ from covalent._shared_files.logger import app_log
 from covalent._shared_files.util_classes import DispatchInfo
 from covalent._workflow.transport import TransportableObject
 from covalent.executor import BaseExecutor
+
+from .scripts import DOCKER_SCRIPT, PYTHON_EXEC_SCRIPT
 
 _EXECUTOR_PLUGIN_DEFAULTS = {
     "credentials": os.environ.get("AWS_SHARED_CREDENTIALS_FILE")
@@ -212,7 +213,7 @@ class AWSBatchExecutor(BaseExecutor):
                     },
                 ]
 
-            app_log.debug("AWS BATCH EXECUTOR: BOTO CLIENT INIT SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: BOTO CLIENT INIT SUCCESS")
 
             batch.register_job_definition(
                 jobDefinitionName=self.batch_job_definition_name,
@@ -241,7 +242,7 @@ class AWSBatchExecutor(BaseExecutor):
                 platformCapabilities=["EC2"],
             )
 
-            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB DEFINITION REGISTRY SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB DEFINITION REGISTRY SUCCESS")
 
             # Submit the job
             response = batch.submit_job(
@@ -250,13 +251,13 @@ class AWSBatchExecutor(BaseExecutor):
                 jobDefinition=self.batch_job_definition_name,
             )
 
-            app_log.debug("AWS BATCH EXECUTOR: JOB SUBMISSION SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: JOB SUBMISSION SUCCESS")
 
             job_id = response["jobId"]
-            app_log.debug(f"AWS BATCH EXECUTOR: JOB ID {job_id}")                
+            app_log.debug(f"AWS BATCH EXECUTOR: JOB ID {job_id}")
 
             self._poll_batch_job(batch, job_id)
-            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB POLL SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB POLL SUCCESS")
 
             return self._query_result(result_filename, task_results_dir, job_id, image_tag)
 
@@ -265,8 +266,6 @@ class AWSBatchExecutor(BaseExecutor):
         func_filename: str,
         result_filename: str,
         docker_working_dir: str,
-        args: List,
-        kwargs: Dict,
     ) -> str:
         """Create an executable Python script which executes the task.
 
@@ -282,36 +281,12 @@ class AWSBatchExecutor(BaseExecutor):
         """
 
         app_log.debug("AWS BATCH EXECUTOR: INSIDE FORMAT EXECSCRIPT METHOD")
-        exec_script = """
-import os
-import boto3
-import cloudpickle as pickle
-
-local_func_filename = os.path.join("{docker_working_dir}", "{func_filename}")
-local_result_filename = os.path.join("{docker_working_dir}", "{result_filename}")
-
-s3 = boto3.client("s3")
-s3.download_file("{s3_bucket_name}", "{func_filename}", local_func_filename)
-
-with open(local_func_filename, "rb") as f:
-    function, args, kwargs = pickle.load(f)
-
-result = function(*args, **kwargs)
-
-with open(local_result_filename, "wb") as f:
-    pickle.dump(result, f)
-
-s3.upload_file(local_result_filename, "{s3_bucket_name}", "{result_filename}")
-""".format(
+        return PYTHON_EXEC_SCRIPT.format(
             func_filename=func_filename,
-            args=args,
-            kwargs=kwargs,
             s3_bucket_name=self.s3_bucket_name,
             result_filename=result_filename,
             docker_working_dir=docker_working_dir,
         )
-
-        return exec_script
 
     def _format_dockerfile(self, exec_script_filename: str, docker_working_dir: str) -> str:
         """Create a Dockerfile which wraps an executable Python task.
@@ -325,27 +300,10 @@ s3.upload_file(local_result_filename, "{s3_bucket_name}", "{result_filename}")
         """
 
         app_log.debug("AWS BATCH EXECUTOR: INSIDE FORMAT DOCKERFILE METHOD")
-        dockerfile = """
-FROM amd64/python:3.8-slim-buster
-
-RUN apt-get update && apt-get install -y \\
-  gcc \\
-  && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir --use-feature=in-tree-build boto3 cloudpickle
-RUN pip install covalent --pre
-
-WORKDIR {docker_working_dir}
-
-COPY {func_basename} {docker_working_dir}
-
-ENTRYPOINT [ "python" ]
-CMD ["{docker_working_dir}/{func_basename}"]
-""".format(
+        return DOCKER_SCRIPT.format(
             func_basename=os.path.basename(exec_script_filename),
             docker_working_dir=docker_working_dir,
         )
-
-        return dockerfile
 
     def _package_and_upload(
         self,
@@ -412,7 +370,10 @@ CMD ["{docker_working_dir}/{func_basename}"]
             # Build the Docker image
             docker_client = docker.from_env()
             image, build_log = docker_client.images.build(
-                path=self.cache_dir, dockerfile=dockerfile_file.name, tag=image_tag, platform="linux/amd64"
+                path=self.cache_dir,
+                dockerfile=dockerfile_file.name,
+                tag=image_tag,
+                platform="linux/amd64",
             )
             app_log.debug("AWS BATCH EXECUTOR: DOCKER BUILD SUCCESS")
 
@@ -470,6 +431,7 @@ CMD ["{docker_working_dir}/{func_basename}"]
         return status, exit_code
 
     def _poll_batch_job(self, batch, job_id: str) -> None:
+        # sourcery skip: raise-specific-error
         """Poll a Batch job until completion.
 
         Args:
