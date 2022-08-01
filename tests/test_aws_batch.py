@@ -24,6 +24,7 @@ from typing import Dict, List
 from unittest.mock import MagicMock
 
 import pytest
+from moto import mock_batch
 
 from covalent_awsbatch_plugin.awsbatch import AWSBatchExecutor
 from covalent_awsbatch_plugin.scripts import DOCKER_SCRIPT, PYTHON_EXEC_SCRIPT
@@ -123,5 +124,11 @@ def test_query_results():
     pass
 
 
-def test_cancel():
-    pass
+def test_cancel(batch_executor, mocker):
+    """Test job cancellation method."""
+
+    mm = MagicMock()
+
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm.terminate_job())
+    batch_executor.cancel(job_id="1", reason="unknown")
+    mm.terminate_job.assert_called_once_with()
