@@ -352,8 +352,6 @@ class AWSBatchExecutor(BaseExecutor):
                 func_filename,
                 result_filename,
                 docker_working_dir,
-                args,
-                kwargs,
             )
             exec_script_file.write(exec_script)
             exec_script_file.flush()

@@ -21,6 +21,7 @@
 """Unit tests for AWS batch executor."""
 
 from typing import Dict, List
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -45,7 +46,7 @@ def batch_executor():
         num_gpus=0,
         retry_attempts=0,
         time_limit=0,
-        poll_freq=0,
+        poll_freq=0.1,
     )
 
 
@@ -102,10 +103,20 @@ def test_get_status(batch_executor):
     assert exit_code == -1
 
 
-def test_poll_batch_job(batch_executor):
+def test_poll_batch_job(batch_executor, mocker):
     """Test the method to poll the batch job."""
 
-    pass
+    get_status_mock = mocker.patch(
+        "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor.get_status",
+        side_effect=[("RUNNING", 1), ("SUCCEEDED", 0), ("RUNNING", 1), ("FAILED", 2)],
+    )
+
+    batch_executor._poll_batch_job(batch=MagicMock(), job_id="1")
+
+    with pytest.raises(Exception):
+        batch_executor._poll_batch_job(batch=MagicMock(), job_id="1")
+
+    get_status_mock.assert_called()
 
 
 def test_query_results():
