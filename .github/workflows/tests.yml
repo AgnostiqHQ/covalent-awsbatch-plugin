@@ -38,8 +38,6 @@ jobs:
           - python:3.8-bullseye
           - python:3.9-buster
           - python:3.9-bullseye
-          - python:3.10-buster
-          - python:3.10-bullseye
           - image: "centos/python-38-centos7"
             options: "--user root"
         experimental: [false]

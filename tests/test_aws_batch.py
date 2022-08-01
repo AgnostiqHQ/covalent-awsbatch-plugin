@@ -102,7 +102,9 @@ def test_get_status(batch_executor):
     assert exit_code == -1
 
 
-def test_poll_batch_job_id():
+def test_poll_batch_job(batch_executor):
+    """Test the method to poll the batch job."""
+
     pass
 
 
