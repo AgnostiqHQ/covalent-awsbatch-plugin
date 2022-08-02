@@ -40,7 +40,6 @@
 
 import base64
 import os
-
 import shutil
 import tempfile
 import time
@@ -50,6 +49,7 @@ from typing import Any, Callable, Dict, List, Tuple
 import boto3
 import cloudpickle as pickle
 import docker
+from covalent._shared_files.config import get_config
 from covalent._shared_files.logger import app_log
 from covalent._shared_files.util_classes import DispatchInfo
 from covalent._workflow.transport import TransportableObject
@@ -102,40 +102,79 @@ class AWSBatchExecutor(BaseExecutor):
 
     def __init__(
         self,
-        credentials: str,
-        profile: str,
-        s3_bucket_name: str,
-        ecr_repo_name: str,
-        batch_queue: str,
-        batch_job_definition_name: str,
-        batch_execution_role_name: str,
-        batch_job_role_name: str,
-        batch_job_log_group_name: str,
-        vcpu: int,
-        memory: float,
-        num_gpus: int,
-        retry_attempts: int,
-        time_limit: int,
-        poll_freq: int,
+        credentials: str = "",
+        profile: str = "",
+        s3_bucket_name: str = "",
+        ecr_repo_name: str = "",
+        batch_queue: str = "",
+        batch_job_definition_name: str = "",
+        batch_execution_role_name: str = "",
+        batch_job_role_name: str = "",
+        batch_job_log_group_name: str = "",
+        vcpu: int = -1,
+        memory: float = -1.0,
+        num_gpus: int = -1,
+        retry_attempts: int = -1,
+        time_limit: int = -1,
+        poll_freq: int = -1,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
-        self.credentials = credentials
-        self.profile = profile
-        self.s3_bucket_name = s3_bucket_name
-        self.ecr_repo_name = ecr_repo_name
-        self.batch_queue = batch_queue
-        self.batch_job_definition_name = batch_job_definition_name
-        self.batch_execution_role_name = batch_execution_role_name
-        self.batch_job_role_name = batch_job_role_name
-        self.batch_job_log_group_name = batch_job_log_group_name
-        self.vcpu = vcpu
-        self.memory = memory
-        self.num_gpus = num_gpus
-        self.retry_attempts = retry_attempts
-        self.time_limit = time_limit
-        self.poll_freq = poll_freq
+        self.credentials = (
+            credentials if credentials != "" else get_config("executors.awsbatch.credentials")
+        )
+        self.profile = profile if profile != "" else get_config("executors.awsbatch.profile")
+        self.s3_bucket_name = (
+            s3_bucket_name
+            if s3_bucket_name != ""
+            else get_config("executors.awsbatch.s3_bucket_name")
+        )
+        self.ecr_repo_name = (
+            ecr_repo_name
+            if ecr_repo_name != ""
+            else get_config("executors.awsbatch.ecr_repo_name")
+        )
+        self.batch_queue = (
+            batch_queue if batch_queue != "" else get_config("executors.awsbatch.batch_queue")
+        )
+        self.batch_job_definition_name = (
+            batch_job_definition_name
+            if batch_job_definition_name != ""
+            else get_config("executors.awsbatch.batch_job_definition_name")
+        )
+        self.batch_execution_role_name = (
+            batch_execution_role_name
+            if batch_execution_role_name != ""
+            else get_config("executors.awsbatch.batch_execution_role_name")
+        )
+        self.batch_job_role_name = (
+            batch_job_role_name
+            if batch_job_role_name != ""
+            else get_config("executors.awsbatch.batch_job_role_name")
+        )
+        self.batch_job_log_group_name = (
+            batch_job_log_group_name
+            if batch_job_log_group_name != ""
+            else get_config("executors.awsbatch.batch_job_log_group_name")
+        )
+        self.vcpu = vcpu if vcpu != -1 else get_config("executors.awsbatch.vcpu")
+        self.memory = memory if memory != -1.0 else get_config("executors.awsbatch.memory")
+        self.num_gpus = num_gpus if num_gpus != -1 else get_config("executors.awsbatch.num_gpus")
+        self.retry_attempts = (
+            retry_attempts
+            if retry_attempts != -1
+            else get_config("executors.awsbatch.retry_attempts")
+        )
+        self.time_limit = (
+            time_limit if time_limit != -1 else get_config("executors.awsbatch.time_limit")
+        )
+        self.poll_freq = (
+            poll_freq if poll_freq != -1 else get_config("executors.awsbatch.poll_freq")
+        )
+
+        if self.cache_dir == "":
+            self.cache_dir = get_config("executors.awsbatch.cache_dir")
 
     def run(self, function: Callable, args: List, kwargs: Dict):
         pass
@@ -212,7 +251,7 @@ class AWSBatchExecutor(BaseExecutor):
                     },
                 ]
 
-            app_log.debug("AWS BATCH EXECUTOR: BOTO CLIENT INIT SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: BOTO CLIENT INIT SUCCESS")
 
             batch.register_job_definition(
                 jobDefinitionName=self.batch_job_definition_name,
@@ -241,7 +280,7 @@ class AWSBatchExecutor(BaseExecutor):
                 platformCapabilities=["EC2"],
             )
 
-            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB DEFINITION REGISTRY SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB DEFINITION REGISTRY SUCCESS")
 
             # Submit the job
             response = batch.submit_job(
@@ -250,13 +289,13 @@ class AWSBatchExecutor(BaseExecutor):
                 jobDefinition=self.batch_job_definition_name,
             )
 
-            app_log.debug("AWS BATCH EXECUTOR: JOB SUBMISSION SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: JOB SUBMISSION SUCCESS")
 
             job_id = response["jobId"]
-            app_log.debug(f"AWS BATCH EXECUTOR: JOB ID {job_id}")                
+            app_log.debug(f"AWS BATCH EXECUTOR: JOB ID {job_id}")
 
             self._poll_batch_job(batch, job_id)
-            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB POLL SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB POLL SUCCESS")
 
             return self._query_result(result_filename, task_results_dir, job_id, image_tag)
 
@@ -304,8 +343,6 @@ with open(local_result_filename, "wb") as f:
 s3.upload_file(local_result_filename, "{s3_bucket_name}", "{result_filename}")
 """.format(
             func_filename=func_filename,
-            args=args,
-            kwargs=kwargs,
             s3_bucket_name=self.s3_bucket_name,
             result_filename=result_filename,
             docker_working_dir=docker_working_dir,
@@ -412,7 +449,10 @@ CMD ["{docker_working_dir}/{func_basename}"]
             # Build the Docker image
             docker_client = docker.from_env()
             image, build_log = docker_client.images.build(
-                path=self.cache_dir, dockerfile=dockerfile_file.name, tag=image_tag, platform="linux/amd64"
+                path=self.cache_dir,
+                dockerfile=dockerfile_file.name,
+                tag=image_tag,
+                platform="linux/amd64",
             )
             app_log.debug("AWS BATCH EXECUTOR: DOCKER BUILD SUCCESS")
 
