@@ -21,11 +21,13 @@
 """Unit tests for AWS batch executor."""
 
 import os
+from base64 import b64encode
 from typing import Dict, List
 from unittest.mock import MagicMock
 
 import cloudpickle
 import pytest
+from covalent import TransportableObject
 
 from covalent_awsbatch_plugin.awsbatch import AWSBatchExecutor
 from covalent_awsbatch_plugin.scripts import DOCKER_SCRIPT, PYTHON_EXEC_SCRIPT
@@ -124,8 +126,70 @@ def test_format_dockerfile(batch_executor):
     )
 
 
-def test_package_and_upload():
-    pass
+def test_upload_file_to_s3(batch_executor, mocker):
+    """Test method to upload file to s3."""
+    mm = MagicMock()
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    batch_executor._upload_file_to_s3(
+        "mock_s3_bucket_name", "mock_temp_function_filename", "mock_s3_function_filename"
+    )
+    mm.upload_file.assert_called_once_with(
+        "mock_temp_function_filename", "mock_s3_bucket_name", "mock_s3_function_filename"
+    )
+
+
+def test_ecr_info(batch_executor, mocker):
+    """Test method to retrieve ecr related info."""
+    mm = MagicMock()
+    mm.get_authorization_token.return_value = {
+        "authorizationData": [
+            {
+                "authorizationToken": b64encode(b"fake_token"),
+                "proxyEndpoint": "proxy_endpoint",
+            }
+        ]
+    }
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    assert batch_executor._get_ecr_info("mock_image_tag") == (
+        "fake_token",
+        "proxy_endpoint",
+        "proxy_endpoint/mock_ecr_repo_name:mock_image_tag",
+    )
+    mm.get_authorization_token.assert_called_once_with()
+
+
+def test_package_and_upload(batch_executor, mocker):
+    """Test the package and upload method."""
+    upload_file_to_s3_mock = mocker.patch(
+        "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._upload_file_to_s3"
+    )
+    format_exec_script_mock = mocker.patch(
+        "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._format_exec_script", return_value=""
+    )
+    format_dockerfile_mock = mocker.patch(
+        "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._format_dockerfile", return_value=""
+    )
+    get_ecr_info_mock = mocker.patch(
+        "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._get_ecr_info",
+        return_value=("", "", ""),
+    )
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.shutil.copyfile")
+    mm = MagicMock()
+    tag_mock = MagicMock()
+    mm.images.build.return_value = tag_mock, "logs"
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.docker.from_env", return_value=mm)
+    batch_executor._package_and_upload(
+        TransportableObject(None),
+        "mock_image_tag",
+        "mock_task_results_dir",
+        "mock_result_filename",
+        [],
+        {},
+    )
+    upload_file_to_s3_mock.assert_called_once()
+    format_exec_script_mock.assert_called_once()
+    format_dockerfile_mock.assert_called_once()
+    get_ecr_info_mock.assert_called_once()
 
 
 def test_get_status(batch_executor):

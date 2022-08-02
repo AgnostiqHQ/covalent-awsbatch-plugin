@@ -399,9 +399,8 @@ class AWSBatchExecutor(BaseExecutor):
             )
             app_log.debug("AWS BATCH EXECUTOR: DOCKER BUILD SUCCESS")
 
-        ecr_username, ecr_password, ecr_registry, ecr_repo_uri = "AWS", self._get_ecr_info(
-            image_tag
-        )
+        ecr_username = "AWS"
+        ecr_password, ecr_registry, ecr_repo_uri = self._get_ecr_info(image_tag)
         app_log.debug("AWS BATCH EXECUTOR: ECR INFO RETRIEVAL SUCCESS")
 
         docker_client.login(username=ecr_username, password=ecr_password, registry=ecr_registry)
