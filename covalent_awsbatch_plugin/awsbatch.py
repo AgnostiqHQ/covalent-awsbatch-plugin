@@ -141,6 +141,12 @@ class AWSBatchExecutor(BaseExecutor):
     def run(self, function: Callable, args: List, kwargs: Dict):
         pass
 
+    def _get_aws_account(self) -> Tuple[Dict, str]:
+        """Get AWS account."""
+        sts = boto3.client("sts")
+        identity = sts.get_caller_identity()
+        return identity, identity.get("Account")
+
     def execute(
         self,
         function: Callable,
@@ -163,10 +169,7 @@ class AWSBatchExecutor(BaseExecutor):
         os.environ["AWS_PROFILE"] = self.profile
         app_log.debug("AWS BATCH EXECUTOR: GET CREDENTIALS AND PROFILE SUCCESS")
 
-        # AWS Account Retrieval
-        sts = boto3.client("sts")
-        identity = sts.get_caller_identity()
-        account = identity.get("Account")
+        identity, account = self._get_aws_account()
         app_log.debug("AWS BATCH EXECUTOR: GET ACCOUNT SUCCESS")
 
         if account is None:

@@ -52,6 +52,15 @@ def batch_executor():
     )
 
 
+def test_get_aws_account(batch_executor, mocker):
+    """Test the method to retrieve the aws account."""
+    mm = MagicMock()
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    batch_executor._get_aws_account()
+    mm.get_caller_identity.called_once_with()
+    mm.get_caller_identity.get.called_once_with("Account")
+
+
 def test_execute():
     pass
 
