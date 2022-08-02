@@ -61,8 +61,43 @@ def test_get_aws_account(batch_executor, mocker):
     mm.get_caller_identity.get.called_once_with("Account")
 
 
-def test_execute():
-    pass
+def test_execute(batch_executor, mocker):
+    """Test the execute method."""
+
+    def mock_func(x):
+        return x
+
+    mm = MagicMock()
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    package_and_upload_mock = mocker.patch(
+        "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._package_and_upload"
+    )
+    poll_batch_job_mock = mocker.patch(
+        "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._poll_batch_job"
+    )
+    query_result_mock = mocker.patch(
+        "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._query_result"
+    )
+    batch_executor.execute(
+        function=mock_func,
+        args=[],
+        kwargs={"x": 1},
+        dispatch_id="mock_dispatch_id",
+        results_dir="/tmp",
+        node_id=1,
+    )
+    package_and_upload_mock.assert_called_once_with(
+        mock_func,
+        "mock_dispatch_id-1",
+        "/tmp/mock_dispatch_id",
+        "result-mock_dispatch_id-1.pkl",
+        [],
+        {"x": 1},
+    )
+    poll_batch_job_mock.assert_called_once()
+    query_result_mock.assert_called_once()
+    mm.register_job_definition.assert_called_once()
+    mm.submit_job.assert_called_once()
 
 
 def test_format_exec_script(batch_executor):
