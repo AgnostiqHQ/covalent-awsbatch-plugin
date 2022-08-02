@@ -113,14 +113,37 @@ def test_poll_batch_job(batch_executor, mocker):
     )
 
     batch_executor._poll_batch_job(batch=MagicMock(), job_id="1")
-
     with pytest.raises(Exception):
         batch_executor._poll_batch_job(batch=MagicMock(), job_id="1")
-
     get_status_mock.assert_called()
 
 
-def test_query_results():
+def test_download_file_from_s3(batch_executor, mocker):
+    """Test method to download file from s3 into local file."""
+
+    mm = MagicMock()
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    batch_executor._download_file_from_s3(
+        "mock_s3_bucket_name", "mock_result_filename", "mock_local_result_filename"
+    )
+    mm.download_file.assert_called_once_with(
+        "mock_s3_bucket_name", "mock_result_filename", "mock_local_result_filename"
+    )
+
+
+def test_get_batch_logstream(batch_executor, mocker):
+    """Test the method to get the batch logstream."""
+
+    mm = MagicMock()
+    mm.describe_jobs.return_value = {"jobs": [{"container": {"logStreamName": "mockLogStream"}}]}
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    assert batch_executor._get_batch_logstream("1") == "mockLogStream"
+    mm.describe_jobs.assert_called_once_with(jobs=["1"])
+
+
+def test_query_results(batch_executor):
+    """Test the method to query the results."""
+
     pass
 
 
@@ -128,7 +151,6 @@ def test_cancel(batch_executor, mocker):
     """Test job cancellation method."""
 
     mm = MagicMock()
-
-    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm.terminate_job())
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
     batch_executor.cancel(job_id="1", reason="unknown")
-    mm.terminate_job.assert_called_once_with()
+    mm.terminate_job.assert_called_once_with(jobId="1", reason="unknown")

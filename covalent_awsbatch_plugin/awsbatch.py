@@ -259,7 +259,7 @@ class AWSBatchExecutor(BaseExecutor):
             self._poll_batch_job(batch, job_id)
             app_log.debug("AWS BATCH EXECUTOR: BATCH JOB POLL SUCCESS")
 
-            return self._query_result(result_filename, task_results_dir, job_id, image_tag)
+            return self._query_result(result_filename, task_results_dir, job_id)
 
     def _format_exec_script(
         self,
@@ -451,12 +451,38 @@ class AWSBatchExecutor(BaseExecutor):
             app_log.debug(f"Job failed with exit code {exit_code}.")
             raise Exception(f"Job failed with exit code {exit_code}.")
 
+    def _download_file_from_s3(
+        self, s3_bucket_name: str, result_filename: str, local_result_filename: str
+    ) -> None:
+        """Download file from s3 into local file."""
+
+        s3 = boto3.client("s3")
+        s3.download_file(s3_bucket_name, result_filename, local_result_filename)
+
+    def _get_batch_logstream(self, job_id: str) -> str:
+        """Get the log stream name corresponding to the batch."""
+
+        batch = boto3.client("batch")
+        return batch.describe_jobs(jobs=[job_id])["jobs"][0]["container"]["logStreamName"]
+
+    def _get_log_events(self, log_group_name: str, log_stream_name: str) -> str:
+        """Get log events corresponding to the log group and stream names."""
+
+        logs = boto3.client("logs")
+
+        # TODO: This should be paginated, but the command doesn't support boto3 pagination
+        # Up to 10000 log events can be returned from a single call to get_log_events()
+        events = logs.get_log_events(
+            logGroupName=log_group_name,
+            logStreamName=log_stream_name,
+        )["events"]
+        return "".join(event["message"] + "\n" for event in events)
+
     def _query_result(
         self,
         result_filename: str,
         task_results_dir: str,
         job_id: str,
-        image_tag: str,
     ) -> Tuple[Any, str, str]:
         """Query and retrieve a completed job's result.
 
@@ -464,7 +490,6 @@ class AWSBatchExecutor(BaseExecutor):
             result_filename: Name of the pickled result file.
             task_results_dir: Local directory where task results are stored.
             job_id: Identifier used to identify a Batch job.
-            image_tag: Tag used to identify the Docker image.
 
         Returns:
             result: The task's result, as a Python object.
@@ -475,30 +500,14 @@ class AWSBatchExecutor(BaseExecutor):
         app_log.debug("AWS BATCH EXECUTOR: INSIDE QUERY RESULT METHOD")
         local_result_filename = os.path.join(task_results_dir, result_filename)
 
-        s3 = boto3.client("s3")
-        s3.download_file(self.s3_bucket_name, result_filename, local_result_filename)
+        self._download_file_from_s3(self.s3_bucket_name, result_filename, local_result_filename)
 
         with open(local_result_filename, "rb") as f:
             result = pickle.load(f)
         os.remove(local_result_filename)
 
-        batch = boto3.client("batch")
-        log_stream_name = batch.describe_jobs(jobs=[job_id])["jobs"][0]["container"][
-            "logStreamName"
-        ]
-
-        logs = boto3.client("logs")
-
-        # TODO: This should be paginated, but the command doesn't support boto3 pagination
-        # Up to 10000 log events can be returned from a single call to get_log_events()
-        events = logs.get_log_events(
-            logGroupName=self.batch_job_log_group_name,
-            logStreamName=log_stream_name,
-        )["events"]
-
-        log_events = ""
-        for event in events:
-            log_events += event["message"] + "\n"
+        log_stream_name = self._get_batch_logstream(job_id)
+        log_events = self._get_log_events(self.batch_job_log_group_name, log_stream_name)
 
         return result, log_events, ""
 
