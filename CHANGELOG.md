@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Reading executor resource details from the config file by default.
 
+[0.5.0] - 2022-08-02
+
+### Added 
+
+- Unit tests for awsbatch.py.
+
+### Removed
+
+- Test action for Python Version 3.10.
+
 ## [0.4.0] - 2022-07-28
 
 ### Added
