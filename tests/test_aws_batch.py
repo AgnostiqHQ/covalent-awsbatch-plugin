@@ -54,31 +54,26 @@ def batch_executor():
     )
 
 
-def test_executor_init_default_values():
+def test_executor_init_default_values(mocker):
     """Test that the init values of the executor are set properly."""
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.get_config", return_value="mock")
     abe = AWSBatchExecutor()
-    assert abe.credentials == get_config("executors.awsbatch.credentials")
-    assert abe.profile == get_config("executors.awsbatch.profile")
-    assert abe.s3_bucket_name == get_config("executors.awsbatch.s3_bucket_name")
-    assert abe.ecr_repo_name == get_config("executors.awsbatch.ecr_repo_name")
-    assert abe.batch_queue == get_config("executors.awsbatch.batch_queue")
-    assert abe.batch_job_definition_name == get_config(
-        "executors.awsbatch.batch_job_definition_name"
-    )
-    assert abe.batch_execution_role_name == get_config(
-        "executors.awsbatch.batch_execution_role_name"
-    )
-    assert abe.batch_job_role_name == get_config("executors.awsbatch.batch_job_role_name")
-    assert abe.batch_job_log_group_name == get_config(
-        "executors.awsbatch.batch_job_log_group_name"
-    )
-    assert abe.vcpu == get_config("executors.awsbatch.vcpu")
-    assert abe.memory == get_config("executors.awsbatch.memory")
-    assert abe.num_gpus == get_config("executors.awsbatch.num_gpus")
-    assert abe.retry_attempts == get_config("executors.awsbatch.retry_attempts")
-    assert abe.time_limit == get_config("executors.awsbatch.time_limit")
-    assert abe.poll_freq == get_config("executors.awsbatch.poll_freq")
-    assert abe.cache_dir == get_config("executors.awsbatch.cache_dir")
+    assert abe.credentials == "mock"
+    assert abe.profile == "mock"
+    assert abe.s3_bucket_name == "mock"
+    assert abe.ecr_repo_name == "mock"
+    assert abe.batch_queue == "mock"
+    assert abe.batch_job_definition_name == "mock"
+    assert abe.batch_execution_role_name == "mock"
+    assert abe.batch_job_role_name == "mock"
+    assert abe.batch_job_log_group_name == "mock"
+    assert abe.vcpu == "mock"
+    assert abe.memory == "mock"
+    assert abe.num_gpus == "mock"
+    assert abe.retry_attempts == "mock"
+    assert abe.time_limit == "mock"
+    assert abe.poll_freq == "mock"
+    assert abe.cache_dir == "mock"
 
 
 def test_get_aws_account(batch_executor, mocker):

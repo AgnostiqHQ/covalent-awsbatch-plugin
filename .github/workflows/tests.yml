@@ -76,9 +76,6 @@ jobs:
 
       - name: Install Covalent
         run: pip install covalent --pre
-
-      - name: Start Covalent dispatcher server
-        run: covalent start --ignore-migrations 
                
       - name: Run tests
         run: PYTHONPATH=$PWD/ pytest tests/ -vv
