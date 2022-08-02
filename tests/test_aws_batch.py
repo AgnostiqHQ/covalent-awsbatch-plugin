@@ -20,11 +20,12 @@
 
 """Unit tests for AWS batch executor."""
 
+import os
 from typing import Dict, List
 from unittest.mock import MagicMock
 
+import cloudpickle
 import pytest
-from moto import mock_batch
 
 from covalent_awsbatch_plugin.awsbatch import AWSBatchExecutor
 from covalent_awsbatch_plugin.scripts import DOCKER_SCRIPT, PYTHON_EXEC_SCRIPT
@@ -57,7 +58,6 @@ def test_execute():
 
 def test_format_exec_script(batch_executor):
     """Test method that constructs the executable tasks-execution Python script."""
-
     kwargs = {
         "func_filename": "mock_function_filename",
         "result_filename": "mock_result_filename",
@@ -71,7 +71,6 @@ def test_format_exec_script(batch_executor):
 
 def test_format_dockerfile(batch_executor):
     """Test method that constructs the dockerfile."""
-
     docker_script = batch_executor._format_dockerfile(
         exec_script_filename="root/mock_exec_script_filename",
         docker_working_dir="mock_docker_working_dir",
@@ -106,7 +105,6 @@ def test_get_status(batch_executor):
 
 def test_poll_batch_job(batch_executor, mocker):
     """Test the method to poll the batch job."""
-
     get_status_mock = mocker.patch(
         "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor.get_status",
         side_effect=[("RUNNING", 1), ("SUCCEEDED", 0), ("RUNNING", 1), ("FAILED", 2)],
@@ -120,7 +118,6 @@ def test_poll_batch_job(batch_executor, mocker):
 
 def test_download_file_from_s3(batch_executor, mocker):
     """Test method to download file from s3 into local file."""
-
     mm = MagicMock()
     mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
     batch_executor._download_file_from_s3(
@@ -133,7 +130,6 @@ def test_download_file_from_s3(batch_executor, mocker):
 
 def test_get_batch_logstream(batch_executor, mocker):
     """Test the method to get the batch logstream."""
-
     mm = MagicMock()
     mm.describe_jobs.return_value = {"jobs": [{"container": {"logStreamName": "mockLogStream"}}]}
     mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
@@ -141,15 +137,38 @@ def test_get_batch_logstream(batch_executor, mocker):
     mm.describe_jobs.assert_called_once_with(jobs=["1"])
 
 
-def test_query_results(batch_executor):
-    """Test the method to query the results."""
+def test_get_log_events(batch_executor, mocker):
+    """Test the method to get log events."""
+    mm = MagicMock()
+    mm.get_log_events.return_value = {"events": [{"message": "hello"}, {"message": "world"}]}
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    assert batch_executor._get_log_events("mock_group", "mock_stream") == "hello\nworld\n"
+    mm.get_log_events.assert_called_once_with(
+        logGroupName="mock_group", logStreamName="mock_stream"
+    )
 
-    pass
+
+def test_query_results(batch_executor, mocker):
+    """Test the method to query the results."""
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._download_file_from_s3")
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._get_batch_logstream")
+    mocker.patch(
+        "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._get_log_events",
+        return_value="mock_logs",
+    )
+    task_results_dir, result_filename = "/tmp", "mock_result_filename.pkl"
+    local_result_filename = os.path.join(task_results_dir, result_filename)
+    with open(local_result_filename, "wb") as f:
+        cloudpickle.dump("hello world", f)
+    assert batch_executor._query_result(result_filename, task_results_dir, "1") == (
+        "hello world",
+        "mock_logs",
+        "",
+    )
 
 
 def test_cancel(batch_executor, mocker):
     """Test job cancellation method."""
-
     mm = MagicMock()
     mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
     batch_executor.cancel(job_id="1", reason="unknown")

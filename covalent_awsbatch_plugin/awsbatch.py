@@ -455,19 +455,16 @@ class AWSBatchExecutor(BaseExecutor):
         self, s3_bucket_name: str, result_filename: str, local_result_filename: str
     ) -> None:
         """Download file from s3 into local file."""
-
         s3 = boto3.client("s3")
         s3.download_file(s3_bucket_name, result_filename, local_result_filename)
 
     def _get_batch_logstream(self, job_id: str) -> str:
         """Get the log stream name corresponding to the batch."""
-
         batch = boto3.client("batch")
         return batch.describe_jobs(jobs=[job_id])["jobs"][0]["container"]["logStreamName"]
 
     def _get_log_events(self, log_group_name: str, log_stream_name: str) -> str:
         """Get log events corresponding to the log group and stream names."""
-
         logs = boto3.client("logs")
 
         # TODO: This should be paginated, but the command doesn't support boto3 pagination
@@ -508,7 +505,6 @@ class AWSBatchExecutor(BaseExecutor):
 
         log_stream_name = self._get_batch_logstream(job_id)
         log_events = self._get_log_events(self.batch_job_log_group_name, log_stream_name)
-
         return result, log_events, ""
 
     def cancel(self, job_id: str, reason: str = "None") -> None:
