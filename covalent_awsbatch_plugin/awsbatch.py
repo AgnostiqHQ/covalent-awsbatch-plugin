@@ -308,6 +308,26 @@ class AWSBatchExecutor(BaseExecutor):
             docker_working_dir=docker_working_dir,
         )
 
+    def _upload_file_to_s3(
+        self, s3_bucket_name: str, temp_function_filename: str, s3_function_filename: str
+    ) -> None:
+        """Upload file to s3."""
+        s3 = boto3.client("s3")
+        s3.upload_file(temp_function_filename, s3_bucket_name, s3_function_filename)
+
+    def _get_ecr_info(self, image_tag: str) -> tuple:
+        """Retrieve ecr details."""
+        ecr = boto3.client("ecr")
+        ecr_credentials = ecr.get_authorization_token()["authorizationData"][0]
+        ecr_password = (
+            base64.b64decode(ecr_credentials["authorizationToken"])
+            .replace(b"AWS:", b"")
+            .decode("utf-8")
+        )
+        ecr_registry = ecr_credentials["proxyEndpoint"]
+        ecr_repo_uri = f"{ecr_registry.replace('https://', '')}/{self.ecr_repo_name}:{image_tag}"
+        return ecr_password, ecr_registry, ecr_repo_uri
+
     def _package_and_upload(
         self,
         function: TransportableObject,
@@ -339,10 +359,11 @@ class AWSBatchExecutor(BaseExecutor):
             # Write serialized function to file
             pickle.dump((function, args, kwargs), function_file)
             function_file.flush()
-
-            # Upload pickled function to S3
-            s3 = boto3.client("s3")
-            s3.upload_file(function_file.name, self.s3_bucket_name, func_filename)
+            self._upload_file_to_s3(
+                temp_function_filename=function_file.name,
+                s3_bucket_name=self.s3_bucket_name,
+                s3_function_filename=func_filename,
+            )
 
         with tempfile.NamedTemporaryFile(
             dir=self.cache_dir, mode="w"
@@ -378,20 +399,11 @@ class AWSBatchExecutor(BaseExecutor):
             )
             app_log.debug("AWS BATCH EXECUTOR: DOCKER BUILD SUCCESS")
 
-        # ECR config
-        ecr = boto3.client("ecr")
-
-        ecr_username = "AWS"
-        ecr_credentials = ecr.get_authorization_token()["authorizationData"][0]
-        ecr_password = (
-            base64.b64decode(ecr_credentials["authorizationToken"])
-            .replace(b"AWS:", b"")
-            .decode("utf-8")
+        ecr_username, ecr_password, ecr_registry, ecr_repo_uri = "AWS", self._get_ecr_info(
+            image_tag
         )
-        ecr_registry = ecr_credentials["proxyEndpoint"]
-        ecr_repo_uri = f"{ecr_registry.replace('https://', '')}/{self.ecr_repo_name}:{image_tag}"
+        app_log.debug("AWS BATCH EXECUTOR: ECR INFO RETRIEVAL SUCCESS")
 
-        app_log.debug("AWS BATCH EXECUTOR: ECR CONFIG SUCCESS")
         docker_client.login(username=ecr_username, password=ecr_password, registry=ecr_registry)
         app_log.debug("AWS BATCH EXECUTOR: DOCKER CLIENT LOGIN SUCCESS")
 
