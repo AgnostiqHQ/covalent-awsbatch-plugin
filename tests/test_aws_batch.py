@@ -27,7 +27,6 @@ from unittest.mock import MagicMock
 
 import cloudpickle
 import pytest
-from covalent import TransportableObject
 
 from covalent_awsbatch_plugin.awsbatch import AWSBatchExecutor
 from covalent_awsbatch_plugin.scripts import DOCKER_SCRIPT, PYTHON_EXEC_SCRIPT
@@ -178,8 +177,9 @@ def test_package_and_upload(batch_executor, mocker):
     tag_mock = MagicMock()
     mm.images.build.return_value = tag_mock, "logs"
     mocker.patch("covalent_awsbatch_plugin.awsbatch.docker.from_env", return_value=mm)
+
     batch_executor._package_and_upload(
-        TransportableObject(None),
+        "mock_transportable_object",
         "mock_image_tag",
         "mock_task_results_dir",
         "mock_result_filename",
