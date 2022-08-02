@@ -51,6 +51,7 @@ def batch_executor():
         retry_attempts=0,
         time_limit=0,
         poll_freq=0.1,
+        cache_dir="mock",
     )
 
 
