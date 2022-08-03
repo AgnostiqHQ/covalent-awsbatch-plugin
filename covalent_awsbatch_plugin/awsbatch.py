@@ -474,7 +474,7 @@ class AWSBatchExecutor(BaseExecutor):
 
     def _get_batch_logstream(self, job_id: str) -> str:
         """Get the log stream name corresponding to the batch."""
-        batch = boto3.client("batch")
+        batch = boto3.Session(profile_name=self.profile).client("batch")
         return batch.describe_jobs(jobs=[job_id])["jobs"][0]["container"]["logStreamName"]
 
     def _get_log_events(self, log_group_name: str, log_stream_name: str) -> str:
