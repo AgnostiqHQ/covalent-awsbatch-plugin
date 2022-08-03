@@ -469,7 +469,7 @@ class AWSBatchExecutor(BaseExecutor):
         self, s3_bucket_name: str, result_filename: str, local_result_filename: str
     ) -> None:
         """Download file from s3 into local file."""
-        s3 = boto3.client("s3")
+        s3 = boto3.Session(profile_name=self.profile).client("s3")
         s3.download_file(s3_bucket_name, result_filename, local_result_filename)
 
     def _get_batch_logstream(self, job_id: str) -> str:
