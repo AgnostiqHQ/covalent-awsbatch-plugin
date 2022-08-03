@@ -56,10 +56,10 @@ def batch_executor():
 def test_get_aws_account(batch_executor, mocker):
     """Test the method to retrieve the aws account."""
     mm = MagicMock()
-    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.Session", return_value=mm)
     batch_executor._get_aws_account()
-    mm.get_caller_identity.called_once_with()
-    mm.get_caller_identity.get.called_once_with("Account")
+    mm.client().get_caller_identity.called_once_with()
+    mm.client().get_caller_identity.get.called_once_with("Account")
 
 
 def test_execute(batch_executor, mocker):
@@ -69,7 +69,7 @@ def test_execute(batch_executor, mocker):
         return x
 
     mm = MagicMock()
-    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.Session", return_value=mm)
     package_and_upload_mock = mocker.patch(
         "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._package_and_upload"
     )
@@ -97,8 +97,8 @@ def test_execute(batch_executor, mocker):
     )
     poll_batch_job_mock.assert_called_once()
     query_result_mock.assert_called_once()
-    mm.register_job_definition.assert_called_once()
-    mm.submit_job.assert_called_once()
+    mm.client().register_job_definition.assert_called_once()
+    mm.client().submit_job.assert_called_once()
 
 
 def test_format_exec_script(batch_executor):
@@ -128,19 +128,20 @@ def test_format_dockerfile(batch_executor):
 def test_upload_file_to_s3(batch_executor, mocker):
     """Test method to upload file to s3."""
     mm = MagicMock()
-    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.Session", return_value=mm)
     batch_executor._upload_file_to_s3(
         "mock_s3_bucket_name", "mock_temp_function_filename", "mock_s3_function_filename"
     )
-    mm.upload_file.assert_called_once_with(
+    mm.client().upload_file.assert_called_once_with(
         "mock_temp_function_filename", "mock_s3_bucket_name", "mock_s3_function_filename"
     )
+    # print(mm.mock_calls)
 
 
 def test_ecr_info(batch_executor, mocker):
     """Test method to retrieve ecr related info."""
     mm = MagicMock()
-    mm.get_authorization_token.return_value = {
+    mm.client().get_authorization_token.return_value = {
         "authorizationData": [
             {
                 "authorizationToken": b64encode(b"fake_token"),
@@ -148,13 +149,13 @@ def test_ecr_info(batch_executor, mocker):
             }
         ]
     }
-    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.Session", return_value=mm)
     assert batch_executor._get_ecr_info("mock_image_tag") == (
         "fake_token",
         "proxy_endpoint",
         "proxy_endpoint/mock_ecr_repo_name:mock_image_tag",
     )
-    mm.get_authorization_token.assert_called_once_with()
+    mm.client().get_authorization_token.assert_called_once_with()
 
 
 def test_package_and_upload(batch_executor, mocker):
@@ -227,11 +228,11 @@ def test_poll_batch_job(batch_executor, mocker):
 def test_download_file_from_s3(batch_executor, mocker):
     """Test method to download file from s3 into local file."""
     mm = MagicMock()
-    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.Session", return_value=mm)
     batch_executor._download_file_from_s3(
         "mock_s3_bucket_name", "mock_result_filename", "mock_local_result_filename"
     )
-    mm.download_file.assert_called_once_with(
+    mm.client().download_file.assert_called_once_with(
         "mock_s3_bucket_name", "mock_result_filename", "mock_local_result_filename"
     )
 
@@ -239,19 +240,23 @@ def test_download_file_from_s3(batch_executor, mocker):
 def test_get_batch_logstream(batch_executor, mocker):
     """Test the method to get the batch logstream."""
     mm = MagicMock()
-    mm.describe_jobs.return_value = {"jobs": [{"container": {"logStreamName": "mockLogStream"}}]}
-    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    mm.client().describe_jobs.return_value = {
+        "jobs": [{"container": {"logStreamName": "mockLogStream"}}]
+    }
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.Session", return_value=mm)
     assert batch_executor._get_batch_logstream("1") == "mockLogStream"
-    mm.describe_jobs.assert_called_once_with(jobs=["1"])
+    mm.client().describe_jobs.assert_called_once_with(jobs=["1"])
 
 
 def test_get_log_events(batch_executor, mocker):
     """Test the method to get log events."""
     mm = MagicMock()
-    mm.get_log_events.return_value = {"events": [{"message": "hello"}, {"message": "world"}]}
-    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    mm.client().get_log_events.return_value = {
+        "events": [{"message": "hello"}, {"message": "world"}]
+    }
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.Session", return_value=mm)
     assert batch_executor._get_log_events("mock_group", "mock_stream") == "hello\nworld\n"
-    mm.get_log_events.assert_called_once_with(
+    mm.client().get_log_events.assert_called_once_with(
         logGroupName="mock_group", logStreamName="mock_stream"
     )
 
@@ -278,6 +283,6 @@ def test_query_results(batch_executor, mocker):
 def test_cancel(batch_executor, mocker):
     """Test job cancellation method."""
     mm = MagicMock()
-    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.client", return_value=mm)
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3.Session", return_value=mm)
     batch_executor.cancel(job_id="1", reason="unknown")
-    mm.terminate_job.assert_called_once_with(jobId="1", reason="unknown")
+    mm.client().terminate_job.assert_called_once_with(jobId="1", reason="unknown")

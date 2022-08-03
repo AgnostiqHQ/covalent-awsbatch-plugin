@@ -202,7 +202,7 @@ class AWSBatchExecutor(BaseExecutor):
             # Create an IAM role for the container (one time only / CDK)
 
             # Register a job definition
-            batch = boto3.client("batch")
+            batch = boto3.Session(profile_name=self.profile).client("batch")
 
             resources = [
                 {"type": "VCPU", "value": str(int(self.vcpu))},
@@ -312,12 +312,12 @@ class AWSBatchExecutor(BaseExecutor):
         self, s3_bucket_name: str, temp_function_filename: str, s3_function_filename: str
     ) -> None:
         """Upload file to s3."""
-        s3 = boto3.client("s3")
+        s3 = boto3.Session(profile_name=self.profile).client("s3")
         s3.upload_file(temp_function_filename, s3_bucket_name, s3_function_filename)
 
     def _get_ecr_info(self, image_tag: str) -> tuple:
         """Retrieve ecr details."""
-        ecr = boto3.client("ecr")
+        ecr = boto3.Session(profile_name=self.profile).client("ecr")
         ecr_credentials = ecr.get_authorization_token()["authorizationData"][0]
         ecr_password = (
             base64.b64decode(ecr_credentials["authorizationToken"])
@@ -533,5 +533,5 @@ class AWSBatchExecutor(BaseExecutor):
         """
 
         app_log.debug("AWS BATCH EXECUTOR: INSIDE CANCEL METHOD")
-        batch = boto3.client("batch")
+        batch = boto3.Session(profile_name=self.profile).client("batch")
         batch.terminate_job(jobId=job_id, reason=reason)
