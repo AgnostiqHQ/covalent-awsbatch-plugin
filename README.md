@@ -8,7 +8,7 @@
 
 ## Covalent AWS Batch Plugin
 
-Covalent is a Pythonic workflow tool used to execute tasks on advanced computing hardware. This executor plugin interfaces Covalent with [AWS Batch](https://docs.aws.amazon.com/batch/). In order for workflows to be deployable, users must have AWS credentials attached to the [CovalentBatchExecutorPolicy](https://github.com/AgnostiqHQ/covalent-awsbatch-plugin/infra/iam/CovalentBatchExecutorPolicy.json). Users will need additional permissions to provision or manage cloud infrastructure used by this plugin.
+Covalent is a Pythonic workflow tool used to execute tasks on advanced computing hardware. This executor plugin interfaces Covalent with [AWS Batch](https://docs.aws.amazon.com/batch/). In order for workflows to be deployable, users must have AWS credentials attached to the [CovalentBatchExecutorPolicy](https://github.com/AgnostiqHQ/covalent-awsbatch-plugin/blob/main/infra/iam/CovalentBatchExecutorPolicy.json). Users will need additional permissions to provision or manage cloud infrastructure used by this plugin.
 
 To use this plugin with Covalent, clone this repository and install it using `pip`:
 
@@ -42,17 +42,7 @@ poll_freq = 10
 
 In the test infrastructure, jobs can run on any instance in the c4 family. If GPUs are required, other instance families should be configured in the compute environment used by the batch queue.
 
-Within a workflow, users can decorate electrons using these default settings:
-
-```python
-import covalent as ct
-
-@ct.electron(executor="fargate")
-def my_task(x, y):
-    return x + y
-```
-
-or use a class object to customize the resources and other behavior:
+In order to use the AWS Batch executor, users can instantiate an `AWSBatchExecutor` object to customize the resources and other behavior:
 
 ```python
 # Request 16 vCPUs and 1GB memory per thread, with a 10-minute time limit.
