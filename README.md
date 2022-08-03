@@ -49,7 +49,7 @@ In order to use the AWS Batch executor, users can instantiate an `AWSBatchExecut
 executor = ct.executor.AWSBatchExecutor(
     vcpu=16,
     memory=16,
-    time_limit = 600
+    time_limit=600
 )
 
 @ct.electron(executor=executor)
