@@ -245,7 +245,7 @@ class AWSBatchExecutor(BaseExecutor):
                 platformCapabilities=["EC2"],
             )
 
-            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB DEFINITION REGISTRY SUCCESS")
+            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB DEFINITION REGISTER SUCCESS")
 
             # Submit the job
             response = batch.submit_job(
