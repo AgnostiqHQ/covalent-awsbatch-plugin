@@ -5,13 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [UNRELEASED]
+## [0.7.0] - 2022-08-03
 
 ### Added
 
 - Reading executor resource details from the config file by default.
 
-[0.5.0] - 2022-08-02
+[0.6.0] - 2022-08-03
 
 ### Added 
 
@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Test action for Python Version 3.10.
+
+## [0.5.0] - 2022-08-03
+
+### Changed
+
+- Updated the README.
 
 ## [0.4.0] - 2022-07-28
 

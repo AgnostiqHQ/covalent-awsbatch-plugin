@@ -183,7 +183,7 @@ class AWSBatchExecutor(BaseExecutor):
 
     def _get_aws_account(self) -> Tuple[Dict, str]:
         """Get AWS account."""
-        sts = boto3.client("sts")
+        sts = boto3.Session(profile_name=self.profile).client("sts")
         identity = sts.get_caller_identity()
         return identity, identity.get("Account")
 
@@ -242,7 +242,7 @@ class AWSBatchExecutor(BaseExecutor):
             # Create an IAM role for the container (one time only / CDK)
 
             # Register a job definition
-            batch = boto3.client("batch")
+            batch = boto3.Session(profile_name=self.profile).client("batch")
 
             resources = [
                 {"type": "VCPU", "value": str(int(self.vcpu))},
@@ -285,7 +285,7 @@ class AWSBatchExecutor(BaseExecutor):
                 platformCapabilities=["EC2"],
             )
 
-            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB DEFINITION REGISTRY SUCCESS")
+            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB DEFINITION REGISTER SUCCESS")
 
             # Submit the job
             response = batch.submit_job(
@@ -352,12 +352,12 @@ class AWSBatchExecutor(BaseExecutor):
         self, s3_bucket_name: str, temp_function_filename: str, s3_function_filename: str
     ) -> None:
         """Upload file to s3."""
-        s3 = boto3.client("s3")
+        s3 = boto3.Session(profile_name=self.profile).client("s3")
         s3.upload_file(temp_function_filename, s3_bucket_name, s3_function_filename)
 
     def _get_ecr_info(self, image_tag: str) -> tuple:
         """Retrieve ecr details."""
-        ecr = boto3.client("ecr")
+        ecr = boto3.Session(profile_name=self.profile).client("ecr")
         ecr_credentials = ecr.get_authorization_token()["authorizationData"][0]
         ecr_password = (
             base64.b64decode(ecr_credentials["authorizationToken"])
@@ -509,17 +509,17 @@ class AWSBatchExecutor(BaseExecutor):
         self, s3_bucket_name: str, result_filename: str, local_result_filename: str
     ) -> None:
         """Download file from s3 into local file."""
-        s3 = boto3.client("s3")
+        s3 = boto3.Session(profile_name=self.profile).client("s3")
         s3.download_file(s3_bucket_name, result_filename, local_result_filename)
 
     def _get_batch_logstream(self, job_id: str) -> str:
         """Get the log stream name corresponding to the batch."""
-        batch = boto3.client("batch")
+        batch = boto3.Session(profile_name=self.profile).client("batch")
         return batch.describe_jobs(jobs=[job_id])["jobs"][0]["container"]["logStreamName"]
 
     def _get_log_events(self, log_group_name: str, log_stream_name: str) -> str:
         """Get log events corresponding to the log group and stream names."""
-        logs = boto3.client("logs")
+        logs = boto3.Session(profile_name=self.profile).client("logs")
 
         # TODO: This should be paginated, but the command doesn't support boto3 pagination
         # Up to 10000 log events can be returned from a single call to get_log_events()
@@ -573,5 +573,5 @@ class AWSBatchExecutor(BaseExecutor):
         """
 
         app_log.debug("AWS BATCH EXECUTOR: INSIDE CANCEL METHOD")
-        batch = boto3.client("batch")
+        batch = boto3.Session(profile_name=self.profile).client("batch")
         batch.terminate_job(jobId=job_id, reason=reason)
