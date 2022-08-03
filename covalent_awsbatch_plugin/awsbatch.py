@@ -143,7 +143,7 @@ class AWSBatchExecutor(BaseExecutor):
 
     def _get_aws_account(self) -> Tuple[Dict, str]:
         """Get AWS account."""
-        sts = boto3.client("sts")
+        sts = boto3.Session(profile_name=self.profile).client("sts")
         identity = sts.get_caller_identity()
         return identity, identity.get("Account")
 
