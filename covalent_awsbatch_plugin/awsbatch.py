@@ -479,7 +479,7 @@ class AWSBatchExecutor(BaseExecutor):
 
     def _get_log_events(self, log_group_name: str, log_stream_name: str) -> str:
         """Get log events corresponding to the log group and stream names."""
-        logs = boto3.client("logs")
+        logs = boto3.Session(profile_name=self.profile).client("logs")
 
         # TODO: This should be paginated, but the command doesn't support boto3 pagination
         # Up to 10000 log events can be returned from a single call to get_log_events()
