@@ -40,7 +40,6 @@
 
 import base64
 import os
-
 import shutil
 import tempfile
 import time
@@ -54,6 +53,8 @@ from covalent._shared_files.logger import app_log
 from covalent._shared_files.util_classes import DispatchInfo
 from covalent._workflow.transport import TransportableObject
 from covalent.executor import BaseExecutor
+
+from .scripts import DOCKER_SCRIPT, PYTHON_EXEC_SCRIPT
 
 _EXECUTOR_PLUGIN_DEFAULTS = {
     "credentials": os.environ.get("AWS_SHARED_CREDENTIALS_FILE")
@@ -140,6 +141,12 @@ class AWSBatchExecutor(BaseExecutor):
     def run(self, function: Callable, args: List, kwargs: Dict):
         pass
 
+    def _get_aws_account(self) -> Tuple[Dict, str]:
+        """Get AWS account."""
+        sts = boto3.Session(profile_name=self.profile).client("sts")
+        identity = sts.get_caller_identity()
+        return identity, identity.get("Account")
+
     def execute(
         self,
         function: Callable,
@@ -162,10 +169,7 @@ class AWSBatchExecutor(BaseExecutor):
         os.environ["AWS_PROFILE"] = self.profile
         app_log.debug("AWS BATCH EXECUTOR: GET CREDENTIALS AND PROFILE SUCCESS")
 
-        # AWS Account Retrieval
-        sts = boto3.client("sts")
-        identity = sts.get_caller_identity()
-        account = identity.get("Account")
+        identity, account = self._get_aws_account()
         app_log.debug("AWS BATCH EXECUTOR: GET ACCOUNT SUCCESS")
 
         if account is None:
@@ -198,7 +202,7 @@ class AWSBatchExecutor(BaseExecutor):
             # Create an IAM role for the container (one time only / CDK)
 
             # Register a job definition
-            batch = boto3.client("batch")
+            batch = boto3.Session(profile_name=self.profile).client("batch")
 
             resources = [
                 {"type": "VCPU", "value": str(int(self.vcpu))},
@@ -212,7 +216,7 @@ class AWSBatchExecutor(BaseExecutor):
                     },
                 ]
 
-            app_log.debug("AWS BATCH EXECUTOR: BOTO CLIENT INIT SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: BOTO CLIENT INIT SUCCESS")
 
             batch.register_job_definition(
                 jobDefinitionName=self.batch_job_definition_name,
@@ -241,7 +245,7 @@ class AWSBatchExecutor(BaseExecutor):
                 platformCapabilities=["EC2"],
             )
 
-            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB DEFINITION REGISTRY SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB DEFINITION REGISTER SUCCESS")
 
             # Submit the job
             response = batch.submit_job(
@@ -250,23 +254,21 @@ class AWSBatchExecutor(BaseExecutor):
                 jobDefinition=self.batch_job_definition_name,
             )
 
-            app_log.debug("AWS BATCH EXECUTOR: JOB SUBMISSION SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: JOB SUBMISSION SUCCESS")
 
             job_id = response["jobId"]
-            app_log.debug(f"AWS BATCH EXECUTOR: JOB ID {job_id}")                
+            app_log.debug(f"AWS BATCH EXECUTOR: JOB ID {job_id}")
 
             self._poll_batch_job(batch, job_id)
-            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB POLL SUCCESS")                
+            app_log.debug("AWS BATCH EXECUTOR: BATCH JOB POLL SUCCESS")
 
-            return self._query_result(result_filename, task_results_dir, job_id, image_tag)
+            return self._query_result(result_filename, task_results_dir, job_id)
 
     def _format_exec_script(
         self,
         func_filename: str,
         result_filename: str,
         docker_working_dir: str,
-        args: List,
-        kwargs: Dict,
     ) -> str:
         """Create an executable Python script which executes the task.
 
@@ -282,36 +284,12 @@ class AWSBatchExecutor(BaseExecutor):
         """
 
         app_log.debug("AWS BATCH EXECUTOR: INSIDE FORMAT EXECSCRIPT METHOD")
-        exec_script = """
-import os
-import boto3
-import cloudpickle as pickle
-
-local_func_filename = os.path.join("{docker_working_dir}", "{func_filename}")
-local_result_filename = os.path.join("{docker_working_dir}", "{result_filename}")
-
-s3 = boto3.client("s3")
-s3.download_file("{s3_bucket_name}", "{func_filename}", local_func_filename)
-
-with open(local_func_filename, "rb") as f:
-    function, args, kwargs = pickle.load(f)
-
-result = function(*args, **kwargs)
-
-with open(local_result_filename, "wb") as f:
-    pickle.dump(result, f)
-
-s3.upload_file(local_result_filename, "{s3_bucket_name}", "{result_filename}")
-""".format(
+        return PYTHON_EXEC_SCRIPT.format(
             func_filename=func_filename,
-            args=args,
-            kwargs=kwargs,
             s3_bucket_name=self.s3_bucket_name,
             result_filename=result_filename,
             docker_working_dir=docker_working_dir,
         )
-
-        return exec_script
 
     def _format_dockerfile(self, exec_script_filename: str, docker_working_dir: str) -> str:
         """Create a Dockerfile which wraps an executable Python task.
@@ -325,27 +303,30 @@ s3.upload_file(local_result_filename, "{s3_bucket_name}", "{result_filename}")
         """
 
         app_log.debug("AWS BATCH EXECUTOR: INSIDE FORMAT DOCKERFILE METHOD")
-        dockerfile = """
-FROM amd64/python:3.8-slim-buster
-
-RUN apt-get update && apt-get install -y \\
-  gcc \\
-  && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir --use-feature=in-tree-build boto3 cloudpickle
-RUN pip install covalent --pre
-
-WORKDIR {docker_working_dir}
-
-COPY {func_basename} {docker_working_dir}
-
-ENTRYPOINT [ "python" ]
-CMD ["{docker_working_dir}/{func_basename}"]
-""".format(
+        return DOCKER_SCRIPT.format(
             func_basename=os.path.basename(exec_script_filename),
             docker_working_dir=docker_working_dir,
         )
 
-        return dockerfile
+    def _upload_file_to_s3(
+        self, s3_bucket_name: str, temp_function_filename: str, s3_function_filename: str
+    ) -> None:
+        """Upload file to s3."""
+        s3 = boto3.Session(profile_name=self.profile).client("s3")
+        s3.upload_file(temp_function_filename, s3_bucket_name, s3_function_filename)
+
+    def _get_ecr_info(self, image_tag: str) -> tuple:
+        """Retrieve ecr details."""
+        ecr = boto3.Session(profile_name=self.profile).client("ecr")
+        ecr_credentials = ecr.get_authorization_token()["authorizationData"][0]
+        ecr_password = (
+            base64.b64decode(ecr_credentials["authorizationToken"])
+            .replace(b"AWS:", b"")
+            .decode("utf-8")
+        )
+        ecr_registry = ecr_credentials["proxyEndpoint"]
+        ecr_repo_uri = f"{ecr_registry.replace('https://', '')}/{self.ecr_repo_name}:{image_tag}"
+        return ecr_password, ecr_registry, ecr_repo_uri
 
     def _package_and_upload(
         self,
@@ -378,10 +359,11 @@ CMD ["{docker_working_dir}/{func_basename}"]
             # Write serialized function to file
             pickle.dump((function, args, kwargs), function_file)
             function_file.flush()
-
-            # Upload pickled function to S3
-            s3 = boto3.client("s3")
-            s3.upload_file(function_file.name, self.s3_bucket_name, func_filename)
+            self._upload_file_to_s3(
+                temp_function_filename=function_file.name,
+                s3_bucket_name=self.s3_bucket_name,
+                s3_function_filename=func_filename,
+            )
 
         with tempfile.NamedTemporaryFile(
             dir=self.cache_dir, mode="w"
@@ -394,8 +376,6 @@ CMD ["{docker_working_dir}/{func_basename}"]
                 func_filename,
                 result_filename,
                 docker_working_dir,
-                args,
-                kwargs,
             )
             exec_script_file.write(exec_script)
             exec_script_file.flush()
@@ -412,24 +392,17 @@ CMD ["{docker_working_dir}/{func_basename}"]
             # Build the Docker image
             docker_client = docker.from_env()
             image, build_log = docker_client.images.build(
-                path=self.cache_dir, dockerfile=dockerfile_file.name, tag=image_tag, platform="linux/amd64"
+                path=self.cache_dir,
+                dockerfile=dockerfile_file.name,
+                tag=image_tag,
+                platform="linux/amd64",
             )
             app_log.debug("AWS BATCH EXECUTOR: DOCKER BUILD SUCCESS")
 
-        # ECR config
-        ecr = boto3.client("ecr")
-
         ecr_username = "AWS"
-        ecr_credentials = ecr.get_authorization_token()["authorizationData"][0]
-        ecr_password = (
-            base64.b64decode(ecr_credentials["authorizationToken"])
-            .replace(b"AWS:", b"")
-            .decode("utf-8")
-        )
-        ecr_registry = ecr_credentials["proxyEndpoint"]
-        ecr_repo_uri = f"{ecr_registry.replace('https://', '')}/{self.ecr_repo_name}:{image_tag}"
+        ecr_password, ecr_registry, ecr_repo_uri = self._get_ecr_info(image_tag)
+        app_log.debug("AWS BATCH EXECUTOR: ECR INFO RETRIEVAL SUCCESS")
 
-        app_log.debug("AWS BATCH EXECUTOR: ECR CONFIG SUCCESS")
         docker_client.login(username=ecr_username, password=ecr_password, registry=ecr_registry)
         app_log.debug("AWS BATCH EXECUTOR: DOCKER CLIENT LOGIN SUCCESS")
 
@@ -470,6 +443,7 @@ CMD ["{docker_working_dir}/{func_basename}"]
         return status, exit_code
 
     def _poll_batch_job(self, batch, job_id: str) -> None:
+        # sourcery skip: raise-specific-error
         """Poll a Batch job until completion.
 
         Args:
@@ -491,12 +465,35 @@ CMD ["{docker_working_dir}/{func_basename}"]
             app_log.debug(f"Job failed with exit code {exit_code}.")
             raise Exception(f"Job failed with exit code {exit_code}.")
 
+    def _download_file_from_s3(
+        self, s3_bucket_name: str, result_filename: str, local_result_filename: str
+    ) -> None:
+        """Download file from s3 into local file."""
+        s3 = boto3.Session(profile_name=self.profile).client("s3")
+        s3.download_file(s3_bucket_name, result_filename, local_result_filename)
+
+    def _get_batch_logstream(self, job_id: str) -> str:
+        """Get the log stream name corresponding to the batch."""
+        batch = boto3.Session(profile_name=self.profile).client("batch")
+        return batch.describe_jobs(jobs=[job_id])["jobs"][0]["container"]["logStreamName"]
+
+    def _get_log_events(self, log_group_name: str, log_stream_name: str) -> str:
+        """Get log events corresponding to the log group and stream names."""
+        logs = boto3.Session(profile_name=self.profile).client("logs")
+
+        # TODO: This should be paginated, but the command doesn't support boto3 pagination
+        # Up to 10000 log events can be returned from a single call to get_log_events()
+        events = logs.get_log_events(
+            logGroupName=log_group_name,
+            logStreamName=log_stream_name,
+        )["events"]
+        return "".join(event["message"] + "\n" for event in events)
+
     def _query_result(
         self,
         result_filename: str,
         task_results_dir: str,
         job_id: str,
-        image_tag: str,
     ) -> Tuple[Any, str, str]:
         """Query and retrieve a completed job's result.
 
@@ -504,7 +501,6 @@ CMD ["{docker_working_dir}/{func_basename}"]
             result_filename: Name of the pickled result file.
             task_results_dir: Local directory where task results are stored.
             job_id: Identifier used to identify a Batch job.
-            image_tag: Tag used to identify the Docker image.
 
         Returns:
             result: The task's result, as a Python object.
@@ -515,31 +511,14 @@ CMD ["{docker_working_dir}/{func_basename}"]
         app_log.debug("AWS BATCH EXECUTOR: INSIDE QUERY RESULT METHOD")
         local_result_filename = os.path.join(task_results_dir, result_filename)
 
-        s3 = boto3.client("s3")
-        s3.download_file(self.s3_bucket_name, result_filename, local_result_filename)
+        self._download_file_from_s3(self.s3_bucket_name, result_filename, local_result_filename)
 
         with open(local_result_filename, "rb") as f:
             result = pickle.load(f)
         os.remove(local_result_filename)
 
-        batch = boto3.client("batch")
-        log_stream_name = batch.describe_jobs(jobs=[job_id])["jobs"][0]["container"][
-            "logStreamName"
-        ]
-
-        logs = boto3.client("logs")
-
-        # TODO: This should be paginated, but the command doesn't support boto3 pagination
-        # Up to 10000 log events can be returned from a single call to get_log_events()
-        events = logs.get_log_events(
-            logGroupName=self.batch_job_log_group_name,
-            logStreamName=log_stream_name,
-        )["events"]
-
-        log_events = ""
-        for event in events:
-            log_events += event["message"] + "\n"
-
+        log_stream_name = self._get_batch_logstream(job_id)
+        log_events = self._get_log_events(self.batch_job_log_group_name, log_stream_name)
         return result, log_events, ""
 
     def cancel(self, job_id: str, reason: str = "None") -> None:
@@ -554,5 +533,5 @@ CMD ["{docker_working_dir}/{func_basename}"]
         """
 
         app_log.debug("AWS BATCH EXECUTOR: INSIDE CANCEL METHOD")
-        batch = boto3.client("batch")
+        batch = boto3.Session(profile_name=self.profile).client("batch")
         batch.terminate_job(jobId=job_id, reason=reason)
