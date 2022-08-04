@@ -42,7 +42,15 @@ poll_freq = 10
 
 In the test infrastructure, jobs can run on any instance in the c4 family. If GPUs are required, other instance families should be configured in the compute environment used by the batch queue.
 
-In order to use the AWS Batch executor, users can instantiate an `AWSBatchExecutor` object to customize the resources and other behavior:
+The user can set the executor using the parameters set in the config file with the string name `awsbatch`:
+
+```python
+@ct.electron(executor="awsbatch")
+def my_custom_task(x, y):
+    return x + y
+```
+
+In addition, users can instantiate an `AWSBatchExecutor` object to customize the resources and other behavior:
 
 ```python
 # Request 16 vCPUs and 1GB memory per thread, with a 10-minute time limit.
@@ -56,6 +64,8 @@ executor = ct.executor.AWSBatchExecutor(
 def my_custom_task(x, y):
     return x + y
 ```
+
+In the latter scenario, the parameters that are not set explicitly are read from the config file.
 
 For more information about how to get started with Covalent, check out the project [homepage](https://github.com/AgnostiqHQ/covalent) and the official [documentation](https://covalent.readthedocs.io/en/latest/).
 

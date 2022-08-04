@@ -75,7 +75,7 @@ jobs:
         run: python setup.py sdist
 
       - name: Install Covalent
-        run: pip install covalent pip install covalent --pre
+        run: pip install covalent --pre
                
       - name: Run tests
         run: PYTHONPATH=$PWD/ pytest tests/ -vv

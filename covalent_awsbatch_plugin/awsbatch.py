@@ -49,6 +49,7 @@ from typing import Any, Callable, Dict, List, Tuple
 import boto3
 import cloudpickle as pickle
 import docker
+from covalent._shared_files.config import get_config
 from covalent._shared_files.logger import app_log
 from covalent._shared_files.util_classes import DispatchInfo
 from covalent._workflow.transport import TransportableObject
@@ -103,40 +104,53 @@ class AWSBatchExecutor(BaseExecutor):
 
     def __init__(
         self,
-        credentials: str,
-        profile: str,
-        s3_bucket_name: str,
-        ecr_repo_name: str,
-        batch_queue: str,
-        batch_job_definition_name: str,
-        batch_execution_role_name: str,
-        batch_job_role_name: str,
-        batch_job_log_group_name: str,
-        vcpu: int,
-        memory: float,
-        num_gpus: int,
-        retry_attempts: int,
-        time_limit: int,
-        poll_freq: int,
+        credentials: str = None,
+        profile: str = None,
+        s3_bucket_name: str = None,
+        ecr_repo_name: str = None,
+        batch_queue: str = None,
+        batch_job_definition_name: str = None,
+        batch_execution_role_name: str = None,
+        batch_job_role_name: str = None,
+        batch_job_log_group_name: str = None,
+        vcpu: int = None,
+        memory: float = None,
+        num_gpus: int = None,
+        retry_attempts: int = None,
+        time_limit: int = None,
+        poll_freq: int = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
-        self.credentials = credentials
-        self.profile = profile
-        self.s3_bucket_name = s3_bucket_name
-        self.ecr_repo_name = ecr_repo_name
-        self.batch_queue = batch_queue
-        self.batch_job_definition_name = batch_job_definition_name
-        self.batch_execution_role_name = batch_execution_role_name
-        self.batch_job_role_name = batch_job_role_name
-        self.batch_job_log_group_name = batch_job_log_group_name
-        self.vcpu = vcpu
-        self.memory = memory
-        self.num_gpus = num_gpus
-        self.retry_attempts = retry_attempts
-        self.time_limit = time_limit
-        self.poll_freq = poll_freq
+        self.credentials = credentials or get_config("executors.awsbatch.credentials")
+        self.profile = profile or get_config("executors.awsbatch.profile")
+        self.s3_bucket_name = s3_bucket_name or get_config("executors.awsbatch.s3_bucket_name")
+        self.ecr_repo_name = ecr_repo_name or get_config("executors.awsbatch.ecr_repo_name")
+        self.batch_queue = batch_queue or get_config("executors.awsbatch.batch_queue")
+        self.batch_job_definition_name = batch_job_definition_name or get_config(
+            "executors.awsbatch.batch_job_definition_name"
+        )
+        self.batch_execution_role_name = batch_execution_role_name or get_config(
+            "executors.awsbatch.batch_execution_role_name"
+        )
+        self.batch_job_role_name = batch_job_role_name or get_config(
+            "executors.awsbatch.batch_job_role_name"
+        )
+        self.batch_job_log_group_name = batch_job_log_group_name or get_config(
+            "executors.awsbatch.batch_job_log_group_name"
+        )
+        self.vcpu = vcpu or get_config("executors.awsbatch.vcpu")
+        self.memory = memory or get_config("executors.awsbatch.memory")
+        self.num_gpus = num_gpus or get_config("executors.awsbatch.num_gpus")
+        self.retry_attempts = retry_attempts or get_config("executors.awsbatch.retry_attempts")
+        self.time_limit = time_limit or get_config("executors.awsbatch.time_limit")
+        self.poll_freq = poll_freq or get_config("executors.awsbatch.poll_freq")
+
+        if self.cache_dir == "":
+            self.cache_dir = get_config("executors.awsbatch.cache_dir")
+
+        Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
 
     def run(self, function: Callable, args: List, kwargs: Dict):
         pass
@@ -191,15 +205,6 @@ class AWSBatchExecutor(BaseExecutor):
             )
             app_log.debug("AWS BATCH EXECUTOR: PACKAGE AND UPLOAD SUCCESS")
             app_log.debug(f"AWS BATCH EXECUTOR: ECR REPO URI SUCCESS ({ecr_repo_uri})")
-
-            # BELOW is specific to AWS Batch
-
-            # Create a Batch Job Queue (one time only / CDK)
-
-            # Create a Batch Compute Environment (one time only / CDK)
-            # Here you can set a list of EC2 instance types
-
-            # Create an IAM role for the container (one time only / CDK)
 
             # Register a job definition
             batch = boto3.Session(profile_name=self.profile).client("batch")

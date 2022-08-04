@@ -33,7 +33,8 @@ from covalent_awsbatch_plugin.scripts import DOCKER_SCRIPT, PYTHON_EXEC_SCRIPT
 
 
 @pytest.fixture
-def batch_executor():
+def batch_executor(mocker):
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.get_config")
     return AWSBatchExecutor(
         credentials="mock_credentials",
         profile="mock_profile",
@@ -50,7 +51,30 @@ def batch_executor():
         retry_attempts=0,
         time_limit=0,
         poll_freq=0.1,
+        cache_dir="mock",
     )
+
+
+def test_executor_init_default_values(mocker):
+    """Test that the init values of the executor are set properly."""
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.get_config", return_value="mock")
+    abe = AWSBatchExecutor()
+    assert abe.credentials == "mock"
+    assert abe.profile == "mock"
+    assert abe.s3_bucket_name == "mock"
+    assert abe.ecr_repo_name == "mock"
+    assert abe.batch_queue == "mock"
+    assert abe.batch_job_definition_name == "mock"
+    assert abe.batch_execution_role_name == "mock"
+    assert abe.batch_job_role_name == "mock"
+    assert abe.batch_job_log_group_name == "mock"
+    assert abe.vcpu == "mock"
+    assert abe.memory == "mock"
+    assert abe.num_gpus == "mock"
+    assert abe.retry_attempts == "mock"
+    assert abe.time_limit == "mock"
+    assert abe.poll_freq == "mock"
+    assert abe.cache_dir == "mock"
 
 
 def test_get_aws_account(batch_executor, mocker):
