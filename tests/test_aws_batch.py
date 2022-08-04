@@ -33,7 +33,8 @@ from covalent_awsbatch_plugin.scripts import DOCKER_SCRIPT, PYTHON_EXEC_SCRIPT
 
 
 @pytest.fixture
-def batch_executor():
+def batch_executor(mocker):
+    mocker.patch("covalent_awsbatch_plugin.awsbatch.get_config")
     return AWSBatchExecutor(
         credentials="mock_credentials",
         profile="mock_profile",
