@@ -60,7 +60,7 @@ from .scripts import DOCKER_SCRIPT, PYTHON_EXEC_SCRIPT
 _EXECUTOR_PLUGIN_DEFAULTS = {
     "credentials": os.environ.get("AWS_SHARED_CREDENTIALS_FILE")
     or os.path.join(os.environ["HOME"], ".aws/credentials"),
-    "profile": os.environ.get("AWS_PROFILE") or "",
+    "profile": os.environ.get("AWS_PROFILE") or "default",
     "s3_bucket_name": "covalent-batch-job-resources",
     "ecr_repo_name": "covalent-batch-job-images",
     "batch_queue": "covalent-batch-queue",
@@ -417,9 +417,10 @@ class AWSBatchExecutor(BaseExecutor):
 
         try:
             response = docker_client.images.push(ecr_repo_uri, tag=image_tag)
+            app_log.debug(f"AWS BATCH EXECUTOR: DOCKER IMAGE PUSH SUCCESS {response}")
         except Exception as e:
             app_log.debug(f"{e}")
-        app_log.debug(f"AWS BATCH EXECUTOR: DOCKER IMAGE PUSH SUCCESS {response}")
+
         return ecr_repo_uri
 
     def get_status(self, batch, job_id: str) -> Tuple[str, int]:
