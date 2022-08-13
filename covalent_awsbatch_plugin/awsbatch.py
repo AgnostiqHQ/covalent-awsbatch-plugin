@@ -20,24 +20,6 @@
 
 """AWS Batch executor plugin for the Covalent dispatcher."""
 
-# Infrastructure required for this executor:
-#       1.-9. See Fargate executor
-#       10. Batch Compute Environment
-#           - Managed
-#           - On-demand EC2 provisioning model
-#           - c4, c5, p3, p4 instance types
-#       11. Batch Job Queue
-#           - Connect to the compute environment
-#       12. CloudWatch Log Group
-#       13. IAM Policy - CovalentBatchJobExecutionPolicy
-#       14. IAM Role - CovalentBatchJobExecutionRole
-#       15. IAM Policy - CovalentBatchJobPolicy
-#       16. IAM Role - CovalentBatchJobRole
-#       17. IAM Policy - CovalentBatchExecutorPolicy
-#       18. IAM Policy - CovalentBatchExecutorInfraPolicy
-#       19. Batch Job Definition - created at runtime
-#       20. Batch Job - created at runtime
-
 import base64
 import os
 import shutil
