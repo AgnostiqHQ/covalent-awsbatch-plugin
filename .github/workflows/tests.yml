@@ -55,11 +55,14 @@ jobs:
             experimental: false
     container: ${{ matrix.container }}
     continue-on-error: ${{ matrix.experimental }}
+    outputs:
+      release: ${{ steps.push.outputs.release }}
     steps:
       - name: Check out head
         uses: actions/checkout@v3
         with:
           persist-credentials: false 
+
       - name: Set up Python
         if: matrix.os == 'macos-latest'
         uses: actions/setup-python@v2
@@ -71,22 +74,59 @@ jobs:
           pip install --no-cache-dir -r requirements.txt
           pip install --no-cache-dir -r tests/requirements.txt
       
-      - name: Build distribution
-        run: python setup.py sdist
-
       - name: Install Covalent
         run: pip install covalent --pre
                
+      - name: Build distribution
+        run: python setup.py sdist
+
+      - name: Validate plugin
+        run: |
+          VERSION="$(cat ./VERSION)"
+          cd dist
+          tar xzf covalent-awsbatch-plugin-${VERSION}.tar.gz
+          diff -r covalent-awsbatch-plugin-${VERSION}/covalent_awsbatch_plugin/ ../covalent_awsbatch_plugin/
+          rm -rf covalent-awsbatch-plugin-${VERSION}/
+          cd ..
+
+      - name: Install ECS plugin
+        run: |
+          VERSION="$(cat ./VERSION)"
+          pip install ./dist/covalent-awsbatch-plugin-${VERSION}.tar.gz
+
       - name: Run tests
-        run: PYTHONPATH=$PWD/ pytest tests/ -vv
+        run: PYTHONPATH=$PWD/tests pytest -vv tests/
+
+      - name: Get latest release
+        uses: actions-ecosystem/action-get-latest-tag@v1
+        id: get-latest-tag
+        if: github.ref == 'refs/heads/develop' && matrix.os == 'ubuntu-latest' && matrix.container == 'python:3.8-buster'
+        with:
+          semver_only: true
 
       - name: Push to main
         id: push
         if: github.ref == 'refs/heads/develop' && matrix.os == 'ubuntu-latest' && matrix.container == 'python:3.8-buster'
         run: |
+          MASTER_VERSION="$(echo ${{ steps.get-latest-tag.outputs.tag }} | cut -c2- )"
           VERSION="$(cat ./VERSION)"
           release=false
-          git config user.name "CovalentOpsBot"
-          git config user.email "covalentopsbot@users.noreply.github.com"
-          git remote set-url origin https://${{ secrets.COVALENT_OPS_BOT_TOKEN }}@github.com/AgnostiqHQ/covalent-awsbatch-plugin.git
-          git push origin HEAD:main
+          if [ "$MASTER_VERSION" = "$VERSION" ] ; then
+            echo "$VERSION has been previously released."
+          else
+            git config user.name "CovalentOpsBot"
+            git config user.email "covalentopsbot@users.noreply.github.com"
+            git remote set-url origin https://${{ secrets.COVALENT_OPS_BOT_TOKEN }}@github.com/AgnostiqHQ/covalent-awsbatch-plugin.git
+            git push origin HEAD:main
+            release=true
+          fi
+          echo "RELEASE=$release" >> $GITHUB_ENV
+          echo "::set-output name=release::$release"
+         
+  release:
+    needs: tests
+    if: github.ref == 'refs/heads/develop' && needs.tests.outputs.release == 'true'
+    uses: AgnostiqHQ/covalent-awsbatch-plugin/.github/workflows/release.yml@develop
+    secrets: inherit
+    with:
+      prerelease: true
