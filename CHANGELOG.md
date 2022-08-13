@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Fixed
+
+- Test trigger fixed
+
 ## [0.8.0] - 2022-08-13
 
 ### Added
 
 - Workflow actions to support releases
-
 
 ## [0.7.1] - 2022-08-10
 
