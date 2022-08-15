@@ -37,7 +37,6 @@ setup_info = {
     "name": "covalent-awsbatch-plugin",
     "packages": find_packages("."),
     "version": version,
-    # Modify any contact information as you see fit
     "maintainer": "Agnostiq",
     "url": "https://github.com/AgnostiqHQ/covalent-awsbatch-plugin",
     "download_url": f"https://github.com/AgnostiqHQ/covalent-awsbatch-plugin/archive/v{version}.tar.gz",
@@ -50,7 +49,7 @@ setup_info = {
     "include_package_data": True,
     "install_requires": required,
     "classifiers": [
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Environment :: Console",
         "Environment :: Plugins",
         "Intended Audience :: Developers",
