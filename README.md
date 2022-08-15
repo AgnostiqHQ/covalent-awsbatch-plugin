@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="https://github.com/AgnostiqHQ/covalent-awsbatch-plugin/blob/main/doc/source/_static/aws_batch_readme_banner.jpg" width=150%>
+<img src="./assets/aws_batch.jpg" width=150%>
 
 </div>
 
