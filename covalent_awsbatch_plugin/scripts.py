@@ -49,7 +49,7 @@ RUN apt-get update && apt-get install -y \\
   gcc \\
   && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir --use-feature=in-tree-build boto3 cloudpickle
-RUN pip install covalent --pre
+RUN pip install covalent==0.177.0
 
 WORKDIR {docker_working_dir}
 

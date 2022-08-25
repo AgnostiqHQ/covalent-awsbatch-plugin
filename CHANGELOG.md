@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- Changed covalent version in templated Dockerfile to correspond to 0.177.0
+
 ## [0.10.0] - 2022-08-17
 
 ### Changed
