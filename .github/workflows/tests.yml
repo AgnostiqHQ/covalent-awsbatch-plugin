@@ -88,7 +88,7 @@ jobs:
           diff -r covalent-awsbatch-plugin-${VERSION}/covalent_awsbatch_plugin/ ../covalent_awsbatch_plugin/
           rm -rf covalent-awsbatch-plugin-${VERSION}/
 
-      - name: Install ECS plugin
+      - name: Install Batch plugin
         run: |
           VERSION="$(cat ./VERSION)"
           pip install ./dist/covalent-awsbatch-plugin-${VERSION}.tar.gz
