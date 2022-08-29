@@ -87,15 +87,30 @@ jobs:
           tar xzf covalent-awsbatch-plugin-${VERSION}.tar.gz
           diff -r covalent-awsbatch-plugin-${VERSION}/covalent_awsbatch_plugin/ ../covalent_awsbatch_plugin/
           rm -rf covalent-awsbatch-plugin-${VERSION}/
-          cd ..
 
-      - name: Install ECS plugin
+      - name: Install Batch plugin
         run: |
           VERSION="$(cat ./VERSION)"
           pip install ./dist/covalent-awsbatch-plugin-${VERSION}.tar.gz
 
+      - name: Test import via entrypoint
+        run: from covalent.executor import AWSBatchExecutor
+        shell: python
+
       - name: Run tests
-        run: PYTHONPATH=$PWD/tests pytest -vv tests/
+        run: PYTHONPATH=$PWD/tests pytest -vv tests/ --cov=covalent_awsbatch_plugin
+
+      - name: Generate coverage report
+        run: coverage xml -o coverage.xml
+      
+      - name: Upload report to Codecov
+        if: >
+          matrix.os == 'ubuntu-latest'
+          && matrix.container == 'python:3.8-buster'
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          name: "Plugin Unit Tests"
 
       - name: Get latest release
         uses: actions-ecosystem/action-get-latest-tag@v1

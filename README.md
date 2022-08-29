@@ -4,21 +4,25 @@
 
 <img src="https://raw.githubusercontent.com/AgnostiqHQ/covalent-awsbatch-plugin/main/assets/aws_batch_readme_banner.jpg" width=150%>
 
+[![covalent](https://img.shields.io/badge/covalent-0.177.0-purple)](https://github.com/AgnostiqHQ/covalent)
+[![python](https://img.shields.io/pypi/pyversions/covalent-awsbatch-plugin)](https://github.com/AgnostiqHQ/covalent-awsbatch-plugin)
+[![tests](https://github.com/AgnostiqHQ/covalent-awsbatch-plugin/actions/workflows/tests.yml/badge.svg)](https://github.com/AgnostiqHQ/covalent-awsbatch-plugin/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/AgnostiqHQ/covalent-awsbatch-plugin/branch/main/graph/badge.svg?token=QNTR18SR5H)](https://codecov.io/gh/AgnostiqHQ/covalent-awsbatch-plugin)
+[![agpl](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.en.html)
+
 </div>
 
 ## Covalent AWS Batch Plugin
 
 Covalent is a Pythonic workflow tool used to execute tasks on advanced computing hardware. This executor plugin interfaces Covalent with [AWS Batch](https://docs.aws.amazon.com/batch/). In order for workflows to be deployable, users must have AWS credentials attached to the [CovalentBatchExecutorPolicy](https://github.com/AgnostiqHQ/covalent-awsbatch-plugin/blob/main/infra/iam/CovalentBatchExecutorPolicy.json). Users will need additional permissions to provision or manage cloud infrastructure used by this plugin.
 
-To use this plugin with Covalent, clone this repository and install it using `pip`:
+To use this plugin with Covalent, install it with `pip`:
 
 ```
-git clone git@github.com:AgnostiqHQ/covalent-awsbatch-plugin.git
-cd covalent-awsbatch-plugin
-pip install .
+pip install covalent-awsbatch-plugin
 ```
 
-Users must add the correct entries to their Covalent [configuration](https://covalent.readthedocs.io/en/latest/how_to/config/customization.html) to support the AWS Batch plugin. Below is an example which works using some basic infrastructure created for testing purposes:
+Users need to modify the entries to their Covalent [configuration](https://covalent.readthedocs.io/en/latest/how_to/config/customization.html) to support the AWS Batch plugin. Below is an example which works using some basic infrastructure created for testing purposes:
 
 ```console
 [executors.awsbatch]
@@ -39,8 +43,6 @@ time_limit = 300
 cache_dir = "/tmp/covalent"
 poll_freq = 10
 ```
-
-In the test infrastructure, jobs can run on any instance in the c4 family. If GPUs are required, other instance families should be configured in the compute environment used by the batch queue.
 
 The user can set the executor using the parameters set in the config file with the string name `awsbatch`:
 
