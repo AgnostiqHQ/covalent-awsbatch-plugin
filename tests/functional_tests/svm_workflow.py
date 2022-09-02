@@ -5,6 +5,8 @@ import executor_instance
 from numpy.random import permutation
 from sklearn import datasets, svm
 
+deps_pip = ct.DepsPip(packages=["numpy==1.22.4", "scikit-learn==1.1.2"])
+
 
 @ct.electron
 def load_data():
@@ -15,7 +17,7 @@ def load_data():
     return iris.data, iris.target
 
 
-@ct.electron(executor=executor_instance.executor)
+@ct.electron(executor=executor_instance.executor, deps_pip=deps_pip)
 def train_svm(data, C, gamma):
     X, y = data
     clf = svm.SVC(C=C, gamma=gamma)
