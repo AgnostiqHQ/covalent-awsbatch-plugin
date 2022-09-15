@@ -35,18 +35,14 @@ import docker
 from covalent._shared_files.config import get_config
 from covalent._shared_files.logger import app_log
 from covalent._shared_files.util_classes import DispatchInfo
-from covalent._workflow.transport import TransportableObject
 from covalent.executor import BaseExecutor
 from covalent_aws_plugins import AWSExecutor
-
-from .scripts import DOCKER_SCRIPT, PYTHON_EXEC_SCRIPT
 
 _EXECUTOR_PLUGIN_DEFAULTS = {
     "credentials": os.environ.get("AWS_SHARED_CREDENTIALS_FILE")
     or os.path.join(os.environ["HOME"], ".aws/credentials"),
     "profile": os.environ.get("AWS_PROFILE") or "default",
     "s3_bucket_name": "covalent-batch-job-resources",
-    "ecr_repo_name": "covalent-batch-job-images",
     "batch_queue": "covalent-batch-queue",
     "batch_job_definition_name": "covalent-batch-jobs",
     "batch_execution_role_name": "ecsTaskExecutionRole",
@@ -76,7 +72,6 @@ class AWSBatchExecutor(AWSExecutor):
         credentials: Full path to AWS credentials file.
         profile: Name of an AWS profile whose credentials are used.
         s3_bucket_name: Name of an S3 bucket where objects are stored.
-        ecr_repo_name: Name of the ECR repository where job images are stored.
         batch_queue: Name of the Batch queue used for job management.
         batch_job_definition_name: Name of the Batch job definition for a user, project, or experiment.
         batch_execution_role_name: Name of the IAM role used by the Batch ECS agent.
@@ -96,7 +91,6 @@ class AWSBatchExecutor(AWSExecutor):
         credentials: str = None,
         profile: str = None,
         s3_bucket_name: str = None,
-        ecr_repo_name: str = None,
         batch_queue: str = None,
         batch_job_definition_name: str = None,
         batch_execution_role_name: str = None,
@@ -120,7 +114,6 @@ class AWSBatchExecutor(AWSExecutor):
             **kwargs,
         )
 
-        self.ecr_repo_name = ecr_repo_name
         self.batch_queue = batch_queue
         self.batch_job_definition_name = batch_job_definition_name
         self.batch_job_role_name = batch_job_role_name
@@ -140,7 +133,6 @@ class AWSBatchExecutor(AWSExecutor):
             "profile": self.profile,
             "region": self.region,
             "credentials": self.credentials_file,
-            "ecr_repo_name": self.ecr_repo_name,
             "batch_queue": self.batch_queue,
             "batch_job_definition_name": self.batch_job_definition_name,
             "batch_job_role_name": self.batch_job_role_name,
@@ -287,7 +279,7 @@ class AWSBatchExecutor(AWSExecutor):
 
             return job_id
 
-    async def get_status(self, batch, job_id: str) -> Tuple[str, int]:
+    async def get_status(self, job_id: str) -> Tuple[str, int]:
         """Query the status of a previously submitted Batch job.
 
         Args:
@@ -325,12 +317,11 @@ class AWSBatchExecutor(AWSExecutor):
 
         self._debug_log(f"Polling task with job id {job_id}...")
 
-        batch = boto3.Session(**self.boto_session_options()).client("batch")
-        status, exit_code = await self.get_status(batch, job_id)
+        status, exit_code = await self.get_status(job_id)
 
         while status not in ["SUCCEEDED", "FAILED"]:
             asyncio.sleep(self.poll_freq)
-            status, exit_code = await self.get_status(batch, job_id)
+            status, exit_code = await self.get_status(job_id)
 
         if exit_code != 0:
             raise Exception(f"Job failed with exit code {exit_code}.")
@@ -350,7 +341,7 @@ class AWSBatchExecutor(AWSExecutor):
         batch = boto3.Session(**self.boto_session_options()).client("batch")
         batch.terminate_job(jobId=job_id, reason=reason)
 
-    def _get_log_events(self, log_stream_name: str) -> str:
+    async def _get_log_events(self, log_stream_name: str) -> str:
         """Get log events corresponding to the log group and stream names."""
         logs = boto3.Session(**self.boto_session_options()).client("logs")
 
