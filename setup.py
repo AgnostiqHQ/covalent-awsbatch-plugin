@@ -41,7 +41,7 @@ plugins_list = ["awsbatch = covalent_awsbatch_plugin.awsbatch"]
 
 setup_info = {
     "name": "covalent-awsbatch-plugin",
-    "packages": find_packages("."),
+    "packages": find_packages(exclude=["tests"]),
     "version": version,
     "maintainer": "Agnostiq",
     "url": "https://github.com/AgnostiqHQ/covalent-awsbatch-plugin",
