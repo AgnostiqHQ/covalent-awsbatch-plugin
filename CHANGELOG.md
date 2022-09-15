@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Updated
+
+- Inheriting from AWSExecutor, updated setup.py to properly treat github packages
+
 ## [0.12.0] - 2022-09-06
 
 ### Added

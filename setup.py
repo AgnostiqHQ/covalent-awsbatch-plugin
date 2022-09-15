@@ -18,6 +18,7 @@
 #
 # Relief from the License may be granted by purchasing a commercial license.
 
+import re
 import site
 import sys
 
@@ -29,7 +30,12 @@ with open("VERSION") as f:
     version = f.read().strip()
 
 with open("requirements.txt") as f:
-    required = f.read().splitlines()
+
+    def git_match_requirement(req):
+        git_req_match = re.search("#egg=(.+)", req)
+        return req if not git_req_match else f"{git_req_match.group(1)} @ {req}"
+
+    required = [git_match_requirement(req) for req in f.read().splitlines()]
 
 plugins_list = ["awsbatch = covalent_awsbatch_plugin.awsbatch"]
 
