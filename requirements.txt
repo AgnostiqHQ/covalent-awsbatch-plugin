@@ -1,3 +1,3 @@
 boto3==1.24.35
-git+https://github.com/AgnostiqHQ/covalent-aws-plugins.git@develop#egg=covalent-aws-plugins
+covalent-aws-plugins==0.1.0rc0
 docker==5.0.3

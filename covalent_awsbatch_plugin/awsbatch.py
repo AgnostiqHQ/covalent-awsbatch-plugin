@@ -320,7 +320,7 @@ class AWSBatchExecutor(AWSExecutor):
         status, exit_code = await self.get_status(job_id)
 
         while status not in ["SUCCEEDED", "FAILED"]:
-            asyncio.sleep(self.poll_freq)
+            await asyncio.sleep(self.poll_freq)
             status, exit_code = await self.get_status(job_id)
 
         if exit_code != 0:
