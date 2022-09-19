@@ -105,27 +105,27 @@ class AWSBatchExecutor(AWSExecutor):
         **kwargs,
     ):
         super().__init__(
-            credentials_file=credentials,
-            profile=profile,
-            s3_bucket_name=s3_bucket_name,
-            execution_role=batch_execution_role_name,
-            poll_freq=poll_freq,
-            log_group_name=batch_job_log_group_name,
+            credentials_file=credentials or get_config("executors.awsbatch.credentials"),
+            profile=profile or get_config("executors.awsbatch.profile"),
+            s3_bucket_name=s3_bucket_name or get_config("executors.awsbatch.s3_bucket_name"),
+            execution_role=batch_execution_role_name or get_config("executors.awsbatch.batch_execution_role_name"),
+            poll_freq=poll_freq or get_config("executors.awsbatch.poll_freq"),
+            log_group_name=batch_job_log_group_name or get_config("executors.awsbatch.batch_job_log_group_name"),
             **kwargs,
         )
 
-        self.batch_queue = batch_queue
-        self.batch_job_definition_name = batch_job_definition_name
-        self.batch_job_role_name = batch_job_role_name
-        self.vcpu = vcpu
-        self.memory = memory
-        self.num_gpus = num_gpus
-        self.retry_attempts = retry_attempts
-        self.time_limit = time_limit
+        self.batch_queue = batch_queue or get_config("executors.awsbatch.batch_queue")
+        self.batch_job_definition_name = batch_job_definition_name or get_config("executors.awsbatch.batch_job_definition_name")
+        self.batch_job_role_name = batch_job_role_name or get_config("executors.awsbatch.batch_job_role_name")
+        self.vcpu = vcpu or get_config("executors.awsbatch.vcpu")
+        self.memory = memory or get_config("executors.awsbatch.memory")
+        self.num_gpus = num_gpus or get_config("executors.awsbatch.num_gpus")
+        self.retry_attempts = retry_attempts or get_config("executors.awsbatch.retry_attempts")
+        self.time_limit = time_limit or get_config("executors.awsbatch.time_limit")
         self._cwd = tempfile.mkdtemp()
 
-        if self.cache_dir == "":
-            self.cache_dir = get_config("executors.awsbatch.cache_dir")
+        self.cache_dir = self.cache_dir or get_config("executors.awsbatch.cache_dir")
+
 
         Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
 
