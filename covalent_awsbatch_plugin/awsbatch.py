@@ -151,7 +151,7 @@ class AWSBatchExecutor(AWSExecutor):
         }
 
         self._debug_log("Starting AWS Batch Executor with config:")
-        app_log.debug(config)
+        self._debug_log(config)
 
     def _debug_log(self, message):
         app_log.debug(f"AWS Batch Executor: {message}")
