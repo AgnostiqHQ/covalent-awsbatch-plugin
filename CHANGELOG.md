@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Fixed
+
+- Using `get_config` to get default configuration when init parameters are not supplied
+
 ## [0.14.0] - 2022-09-15
 
 ### Changed

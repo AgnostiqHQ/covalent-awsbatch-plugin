@@ -44,8 +44,8 @@ class TestECSExecutor:
     MOCK_VCPU = 0.1234
     MOCK_MEMORY = "123"
     MOCK_GPUS = 1
-    MOCK_RETRY_ATTEMPTS = 0
-    MOCK_TIME_LIMIT = 0
+    MOCK_RETRY_ATTEMPTS = 1
+    MOCK_TIME_LIMIT = 1
     MOCK_POLL_FREQ = 123
     MOCK_DISPATCH_ID = 112233
     MOCK_NODE_ID = 1
@@ -66,7 +66,7 @@ class TestECSExecutor:
     def mock_executor_config(self, tmp_path: Path):
         MOCK_CREDENTIALS_FILE = tmp_path / "credentials"
         MOCK_CREDENTIALS_FILE.touch()
-        config = {
+        return {
             "credentials": str(MOCK_CREDENTIALS_FILE),
             "profile": self.MOCK_PROFILE,
             "s3_bucket_name": self.MOCK_S3_BUCKET_NAME,
@@ -82,7 +82,6 @@ class TestECSExecutor:
             "time_limit": self.MOCK_TIME_LIMIT,
             "poll_freq": self.MOCK_POLL_FREQ,
         }
-        return config
 
     @pytest.fixture
     def mock_executor(self, mock_executor_config):
@@ -93,6 +92,7 @@ class TestECSExecutor:
 
         # only call to get_config is get_config("executors.ecs.cache_dir")
         mocker.patch("covalent_awsbatch_plugin.awsbatch.get_config", return_value="mock")
+        # print(mock_executor_config)
         executor = AWSBatchExecutor(**mock_executor_config)
 
         assert executor.profile == self.MOCK_PROFILE
