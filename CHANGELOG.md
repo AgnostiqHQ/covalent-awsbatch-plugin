@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Using `get_donfig` to get default configuration when init parameters are not supplied
+- Using `get_config` to get default configuration when init parameters are not supplied
 
 ## [0.14.0] - 2022-09-15
 
