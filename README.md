@@ -28,7 +28,7 @@ pip install covalent-awsbatch-plugin
 
 ## 2. Usage Example
 
-This is an example of how a workflow can be adapted to utilize the AWS Batch Executor. Here we train a simple Support Vector Machine (SVM) model and use an existing AWS Batch Compute environment to run the `train_svm` electron as a batch job. We also note we require [DepsPip](https://covalent.readthedocs.io/en/latest/concepts/concepts.html#depspip) to install the dependencies on the EC2 instance.
+This is an example of how a workflow can be adapted to utilize the AWS Batch Executor. Here we train a simple Support Vector Machine (SVM) model and use an existing AWS Batch Compute environment to run the `train_svm` electron as a batch job. We also note we require [DepsPip](https://covalent.readthedocs.io/en/latest/concepts/concepts.html#depspip) to install the dependencies when creating the batch job.
 
 ```python
 from numpy.random import permutation
