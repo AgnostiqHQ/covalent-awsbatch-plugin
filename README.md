@@ -46,9 +46,9 @@ executor = ct.executor.AWSBatchExecutor(
     batch_execution_role_name = "ecsTaskExecutionRole",
     batch_job_role_name = "covalent-batch-qa-job-role",
     batch_job_log_group_name = "covalent-batch-qa-log-group",
-    vcpu = 2,
-    memory = 3.75,
-    time_limit = 300,
+    vcpu = 2, # Number of vCPUs to allocate
+    memory = 3.75, # Memory in GB to allocate
+    time_limit = 300, # Time limit of job in seconds
 )
 
 # Use executor plugin to train our SVM model.
