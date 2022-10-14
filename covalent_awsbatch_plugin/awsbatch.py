@@ -23,6 +23,7 @@
 import asyncio
 import os
 import tempfile
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
@@ -169,14 +170,10 @@ class AWSBatchExecutor(AWSExecutor):
 
         return await self.query_result(task_metadata)
 
-    async def _upload_task(self, function, args, kwargs, task_metadata) -> None:
+    async def _upload_task_to_s3(self, dispatch_id, node_id, function, args, kwargs) -> None:
         """
         Uploads the pickled function to the remote cache.
         """
-
-        dispatch_id = task_metadata["dispatch_id"]
-        node_id = task_metadata["node_id"]
-
         s3 = boto3.Session(**self.boto_session_options()).client("s3")
         s3_object_filename = FUNC_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
 
@@ -189,6 +186,24 @@ class AWSBatchExecutor(AWSExecutor):
             pickle.dump((function, args, kwargs), function_file)
             function_file.flush()
             s3.upload_file(function_file.name, self.s3_bucket_name, s3_object_filename)
+
+    async def _upload_task(
+        self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict
+    ):
+        """Wrapper to make boto3 s3 upload calls async."""
+        dispatch_id = task_metadata["dispatch_id"]
+        node_id = task_metadata["node_id"]
+        loop = asyncio.get_running_loop()
+        future = loop.run_in_executor(
+            None,
+            self._upload_task_to_s3,
+            dispatch_id,
+            node_id,
+            function,
+            args,
+            kwargs,
+        )
+        return await future
 
     async def submit_task(self, task_metadata: Dict, identity: Dict) -> Any:
         """

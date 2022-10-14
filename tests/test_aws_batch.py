@@ -20,11 +20,8 @@
 
 """Unit tests for AWS batch executor."""
 
-import os
-from base64 import b64encode
 from pathlib import Path
 from typing import Dict, List
-from unittest.mock import ANY, MagicMock
 
 import cloudpickle
 import pytest
@@ -32,7 +29,7 @@ import pytest
 from covalent_awsbatch_plugin.awsbatch import FUNC_FILENAME, RESULT_FILENAME, AWSBatchExecutor
 
 
-class TestECSExecutor:
+class TestAWSBatchExecutor:
 
     MOCK_PROFILE = "my_profile"
     MOCK_S3_BUCKET_NAME = "s3-bucket"
@@ -110,19 +107,21 @@ class TestECSExecutor:
         assert executor.poll_freq == self.MOCK_POLL_FREQ
 
     @pytest.mark.asyncio
-    async def test_upload_file(self, mock_executor, mocker):
+    async def test_upload_file_to_s3(self, mock_executor, mocker):
         """Test method to upload file to s3."""
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
 
         def some_function():
             pass
 
-        await mock_executor._upload_task(
-            some_function, ("some_arg"), {"some": "kwarg"}, self.MOCK_TASK_METADATA
+        await mock_executor._upload_task_to_s3(
+            some_function,
+            self.MOCK_DISPATCH_ID,
+            self.MOCK_NODE_ID,
+            ("some_arg"),
+            {"some": "kwarg"},
         )
-        boto3_mock.Session().client().upload_file.assert_called_once_with(
-            ANY, self.MOCK_S3_BUCKET_NAME, self.MOCK_FUNC_FILENAME
-        )
+        boto3_mock.Session().client().upload_file.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_status(self, mocker, mock_executor):
@@ -248,7 +247,7 @@ class TestECSExecutor:
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
 
         upload_task_mock = mocker.patch(
-            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._upload_task"
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._upload_task_to_s3"
         )
         validate_credentials_mock = mocker.patch(
             "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._validate_credentials"
