@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- Updated `boto3` calls to make them compatible with the async library.
+
 ### Docs
 
 - Updated docs to include more information about required/optional config values, and provide information about each cloud resource that needs to be provisioned 

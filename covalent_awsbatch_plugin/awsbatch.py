@@ -21,21 +21,16 @@
 """AWS Batch executor plugin for the Covalent dispatcher."""
 
 import asyncio
-import base64
 import os
-import shutil
 import tempfile
-import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
 import boto3
 import cloudpickle as pickle
-import docker
 from covalent._shared_files.config import get_config
 from covalent._shared_files.logger import app_log
 from covalent._shared_files.util_classes import DispatchInfo
-from covalent.executor import BaseExecutor
 from covalent_aws_plugins import AWSExecutor
 
 _EXECUTOR_PLUGIN_DEFAULTS = {
