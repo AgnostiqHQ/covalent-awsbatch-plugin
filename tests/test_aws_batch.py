@@ -298,3 +298,10 @@ class TestAWSBatchExecutor:
 
         _poll_task_mock.assert_called_once_with(returned_job_id)
         query_result_mock.assert_called_once_with(self.MOCK_TASK_METADATA)
+
+    async def test_submit_task(self, mocker, mock_executor):
+        MOCK_IDENTITY = {"Account": 1234}
+        boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
+        await mock_executor.submit_task(self.MOCK_TASK_METADATA, MOCK_IDENTITY)
+        boto3_mock.Session().client().register_task_definition.assert_called_once()
+        boto3_mock.Session().client().submit_job.assert_called_once()
