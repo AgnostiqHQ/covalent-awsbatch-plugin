@@ -298,8 +298,8 @@ class AWSBatchExecutor(AWSExecutor):
         """
         self._debug_log("Checking job status...")
         batch = boto3.Session(**self.boto_session_options()).client("batch")
-
-        job = batch.describe_jobs(jobs=[job_id])
+        partial_func = partial(batch.describe_jobs, jobs=[job_id])
+        job = await _execute_partial_in_threadpool(partial_func)
         status = job["jobs"][0]["status"]
 
         self._debug_log(f"Got job status {status}")
@@ -307,20 +307,10 @@ class AWSBatchExecutor(AWSExecutor):
             exit_code = int(job["jobs"][0]["container"]["exitCode"])
         except Exception as e:
             exit_code = -1
-
         return status, exit_code
 
     async def _poll_task(self, job_id: str) -> Any:
-        """Poll a Batch job until completion.
-
-        Args:
-            batch: Batch client object.
-            job_id: Identifier used to identify a Batch job.
-
-        Returns:
-            None
-        """
-
+        """Poll a Batch job until completion."""
         self._debug_log(f"Polling task with job id {job_id}...")
 
         status, exit_code = await self.get_status(job_id)
@@ -345,7 +335,8 @@ class AWSBatchExecutor(AWSExecutor):
 
         self._debug_log("Cancelling job ID {job_id}...")
         batch = boto3.Session(**self.boto_session_options()).client("batch")
-        batch.terminate_job(jobId=job_id, reason=reason)
+        partial_func = partial(batch.terminate_job, jobId=job_id, reason=reason)
+        await _execute_partial_in_threadpool(partial_func)
 
     async def _get_log_events(self, log_stream_name: str) -> str:
         """Get log events corresponding to the log group and stream names."""
@@ -353,11 +344,13 @@ class AWSBatchExecutor(AWSExecutor):
 
         # TODO: This should be paginated, but the command doesn't support boto3 pagination
         # Up to 10000 log events can be returned from a single call to get_log_events()
-        events = logs.get_log_events(
+        partial_func = partial(
+            logs.get_log_events,
             logGroupName=self.log_group_name,
             logStreamName=log_stream_name,
-        )["events"]
-
+        )
+        future = await _execute_partial_in_threadpool(partial_func)
+        events = future["events"]
         return "".join(event["message"] + "\n" for event in events)
 
     async def _download_file_from_s3(
@@ -365,7 +358,10 @@ class AWSBatchExecutor(AWSExecutor):
     ) -> None:
         """Download file from s3 into local file."""
         s3 = boto3.Session(**self.boto_session_options()).client("s3")
-        s3.download_file(s3_bucket_name, result_filename, local_result_filename)
+        partial_func = partial(
+            s3.download_file, s3_bucket_name, result_filename, local_result_filename
+        )
+        await _execute_partial_in_threadpool(partial_func)
 
     async def query_result(self, task_metadata: Dict) -> Tuple[Any, str, str]:
         """Query and retrieve a completed job's result.
