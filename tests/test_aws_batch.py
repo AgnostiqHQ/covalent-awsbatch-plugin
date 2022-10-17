@@ -43,7 +43,7 @@ class TestAWSBatchExecutor:
     MOCK_GPUS = 1
     MOCK_RETRY_ATTEMPTS = 1
     MOCK_TIME_LIMIT = 1
-    MOCK_POLL_FREQ = 123
+    MOCK_POLL_FREQ = 1
     MOCK_DISPATCH_ID = 112233
     MOCK_NODE_ID = 1
 
@@ -247,7 +247,7 @@ class TestAWSBatchExecutor:
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
 
         upload_task_mock = mocker.patch(
-            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._upload_task_to_s3"
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._upload_task"
         )
         validate_credentials_mock = mocker.patch(
             "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._validate_credentials"

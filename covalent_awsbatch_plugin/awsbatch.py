@@ -34,6 +34,8 @@ from covalent._shared_files.logger import app_log
 from covalent._shared_files.util_classes import DispatchInfo
 from covalent_aws_plugins import AWSExecutor
 
+from .utils import _execute_partial_in_threadpool
+
 _EXECUTOR_PLUGIN_DEFAULTS = {
     "credentials": os.environ.get("AWS_SHARED_CREDENTIALS_FILE")
     or os.path.join(os.environ["HOME"], ".aws/credentials"),
@@ -193,9 +195,7 @@ class AWSBatchExecutor(AWSExecutor):
         """Wrapper to make boto3 s3 upload calls async."""
         dispatch_id = task_metadata["dispatch_id"]
         node_id = task_metadata["node_id"]
-        loop = asyncio.get_running_loop()
-        future = loop.run_in_executor(
-            None,
+        partial_func = partial(
             self._upload_task_to_s3,
             dispatch_id,
             node_id,
@@ -203,7 +203,7 @@ class AWSBatchExecutor(AWSExecutor):
             args,
             kwargs,
         )
-        return await future
+        return await _execute_partial_in_threadpool(partial_func)
 
     async def submit_task(self, task_metadata: Dict, identity: Dict) -> Any:
         """
