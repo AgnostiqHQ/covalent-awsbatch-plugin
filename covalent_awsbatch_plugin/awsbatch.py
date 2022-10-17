@@ -169,7 +169,8 @@ class AWSBatchExecutor(AWSExecutor):
 
         await self._poll_task(job_id)
 
-        return await self.query_result(task_metadata)
+        partial_func = partial(self.query_result, task_metadata)
+        return await _execute_partial_in_threadpool(partial_func)
 
     async def _upload_task_to_s3(self, dispatch_id, node_id, function, args, kwargs) -> None:
         """
@@ -372,7 +373,6 @@ class AWSBatchExecutor(AWSExecutor):
         Returns:
             result: The task's result, as a Python object.
         """
-
         dispatch_id = task_metadata["dispatch_id"]
         node_id = task_metadata["node_id"]
 
@@ -395,4 +395,6 @@ class AWSBatchExecutor(AWSExecutor):
     async def _get_batch_logstream(self, job_id: str) -> str:
         """Get the log stream name corresponding to the batch."""
         batch = boto3.Session(profile_name=self.profile).client("batch")
-        return batch.describe_jobs(jobs=[job_id])["jobs"][0]["container"]["logStreamName"]
+        partial_func = partial(batch.describe_jobs, [job_id])
+        future = await _execute_partial_in_threadpool(partial_func)
+        return future["jobs"][0]["container"]["logStreamName"]
