@@ -22,6 +22,7 @@
 
 from pathlib import Path
 from typing import Dict, List
+from unittest.mock import AsyncMock
 
 import cloudpickle
 import pytest
@@ -122,6 +123,23 @@ class TestAWSBatchExecutor:
             {"some": "kwarg"},
         )
         boto3_mock.Session().client().upload_file.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_upload_task(self, mock_executor, mocker):
+        """Test for method to call the upload task method."""
+
+        def some_function(x):
+            return x
+
+        upload_to_s3_mock = mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._upload_task_to_s3",
+            return_value=AsyncMock(),
+        )
+
+        await mock_executor._upload_task(some_function, (1), {}, self.MOCK_TASK_METADATA)
+        upload_to_s3_mock.assert_called_once_with(
+            self.MOCK_DISPATCH_ID, self.MOCK_NODE_ID, some_function, (1), {}
+        )
 
     @pytest.mark.asyncio
     async def test_get_status(self, mocker, mock_executor):
