@@ -192,15 +192,19 @@ class TestAWSBatchExecutor:
     @pytest.mark.asyncio
     async def test_get_batch_logstream(self, mock_executor, mocker):
         """Test the method to get the batch logstream."""
+        RETURN_VALUE = {"jobs": [{"container": {"logStreamName": "mockLogStream"}}]}
 
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
         client_mock = boto3_mock.Session().client()
 
-        client_mock.describe_jobs.return_value = {
-            "jobs": [{"container": {"logStreamName": "mockLogStream"}}]
-        }
-        assert await mock_executor._get_batch_logstream("1") == "mockLogStream"
-        client_mock.describe_jobs.assert_called_once_with(jobs=["1"])
+        threadpool_mock = mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch._execute_partial_in_threadpool",
+            return_value=RETURN_VALUE,
+        )
+
+        future = await mock_executor._get_batch_logstream("1")
+        assert future == "mockLogStream"
+        threadpool_mock.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_log_events(self, mock_executor, mocker):
