@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.17.0] - 2022-10-18
+
 ### Changed
 
 - Updated `boto3` calls to make them compatible with the async library.
