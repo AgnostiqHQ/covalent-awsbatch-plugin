@@ -138,6 +138,8 @@ class AWSBatchExecutor(AWSExecutor):
             "batch_queue": self.batch_queue,
             "batch_job_definition_name": self.batch_job_definition_name,
             "batch_job_role_name": self.batch_job_role_name,
+            "batch_job_log_group_name": self.log_group_name,
+            "batch_execution_role_name": self.execution_role,
             "vcpu": self.vcpu,
             "memory": self.memory,
             "num_gpus": self.num_gpus,
@@ -161,18 +163,19 @@ class AWSBatchExecutor(AWSExecutor):
         self._debug_log(f"Executing Dispatch ID {dispatch_id} Node {node_id}")
 
         self._debug_log("Validating Credentials...")
-        identity = self._validate_credentials(raise_exception=True)
+        partial_func = partial(self._validate_credentials, raise_exception=True)
+        identity = await _execute_partial_in_threadpool(partial_func)
 
         await self._upload_task(function, args, kwargs, task_metadata)
         job_id = await self.submit_task(task_metadata, identity)
         self._debug_log(f"Successfully submitted job with ID: {job_id}")
 
         await self._poll_task(job_id)
+        result = await self.query_result(task_metadata)
+        self._debug_log(f"Successfully queried result: {result}")
+        return result
 
-        partial_func = partial(self.query_result, task_metadata)
-        return await _execute_partial_in_threadpool(partial_func)
-
-    async def _upload_task_to_s3(self, dispatch_id, node_id, function, args, kwargs) -> None:
+    def _upload_task_to_s3(self, dispatch_id, node_id, function, args, kwargs) -> None:
         """
         Uploads the pickled function to the remote cache.
         """
@@ -364,6 +367,12 @@ class AWSBatchExecutor(AWSExecutor):
         )
         await _execute_partial_in_threadpool(partial_func)
 
+    def load_pickle_file(self, filename):
+        with open(filename, "rb") as f:
+            result = pickle.load(f)
+        os.remove(filename)
+        return result
+
     async def query_result(self, task_metadata: Dict) -> Tuple[Any, str, str]:
         """Query and retrieve a completed job's result.
 
@@ -380,16 +389,15 @@ class AWSBatchExecutor(AWSExecutor):
         local_result_filename = os.path.join(self._cwd, result_filename)
 
         app_log.debug(
-            "Downloading result file {result_filename} from S3 bucket {self.s3_bucket_name} to local path {local_result_filename}..."
+            f"Downloading result file {result_filename} from S3 bucket {self.s3_bucket_name} to local path {local_result_filename}..."
         )
         await self._download_file_from_s3(
             self.s3_bucket_name, result_filename, local_result_filename
         )
 
-        with open(local_result_filename, "rb") as f:
-            result = pickle.load(f)
-        os.remove(local_result_filename)
-
+        result = await _execute_partial_in_threadpool(
+            partial(self.load_pickle_file, local_result_filename)
+        )
         return result
 
     async def _get_batch_logstream(self, job_id: str) -> str:

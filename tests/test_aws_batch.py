@@ -115,7 +115,7 @@ class TestAWSBatchExecutor:
         def some_function():
             pass
 
-        await mock_executor._upload_task_to_s3(
+        mock_executor._upload_task_to_s3(
             some_function,
             self.MOCK_DISPATCH_ID,
             self.MOCK_NODE_ID,
