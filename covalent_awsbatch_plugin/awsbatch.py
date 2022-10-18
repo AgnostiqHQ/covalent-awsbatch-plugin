@@ -33,7 +33,7 @@ from covalent._shared_files.config import get_config
 from covalent._shared_files.logger import app_log
 from covalent_aws_plugins import AWSExecutor
 
-from .utils import _execute_partial_in_threadpool
+from .utils import _execute_partial_in_threadpool, _load_pickle_file
 
 _EXECUTOR_PLUGIN_DEFAULTS = {
     "credentials": os.environ.get("AWS_SHARED_CREDENTIALS_FILE")
@@ -367,12 +367,6 @@ class AWSBatchExecutor(AWSExecutor):
         )
         await _execute_partial_in_threadpool(partial_func)
 
-    def load_pickle_file(self, filename):
-        with open(filename, "rb") as f:
-            result = pickle.load(f)
-        os.remove(filename)
-        return result
-
     async def query_result(self, task_metadata: Dict) -> Tuple[Any, str, str]:
         """Query and retrieve a completed job's result.
 
@@ -396,7 +390,7 @@ class AWSBatchExecutor(AWSExecutor):
         )
 
         result = await _execute_partial_in_threadpool(
-            partial(self.load_pickle_file, local_result_filename)
+            partial(_load_pickle_file, local_result_filename)
         )
         return result
 

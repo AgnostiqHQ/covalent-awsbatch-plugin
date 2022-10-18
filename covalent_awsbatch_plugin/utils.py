@@ -21,8 +21,19 @@
 """Helper methods for AWS Batch executor plugin."""
 
 import asyncio
+import os
+
+import cloudpickle as pickle
 
 
 async def _execute_partial_in_threadpool(partial_func):
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, partial_func)
+
+
+def _load_pickle_file(filename):
+    """Method to load the pickle file."""
+    with open(filename, "rb") as f:
+        result = pickle.load(f)
+    os.remove(filename)
+    return result

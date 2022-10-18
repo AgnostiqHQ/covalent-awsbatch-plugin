@@ -20,11 +20,14 @@
 
 """Unit tests for AWS Batch executor utils file."""
 
+import tempfile
 from functools import partial
+from pathlib import Path
 
+import cloudpickle as pickle
 import pytest
 
-from covalent_awsbatch_plugin.utils import _execute_partial_in_threadpool
+from covalent_awsbatch_plugin.utils import _execute_partial_in_threadpool, _load_pickle_file
 
 
 @pytest.mark.asyncio
@@ -37,3 +40,15 @@ async def test_execute_partial_in_threadpool():
     partial_func = partial(test_func, x=1)
     future = await _execute_partial_in_threadpool(partial_func)
     assert future == 1
+
+
+def test_load_pickle_file(mocker):
+    """Test the method used to load the pickled file and delete the file afterwards."""
+    temp_fp = "/tmp/test.pkl"
+    with open(temp_fp, "wb") as f:
+        pickle.dump("test success", f)
+
+    assert Path(temp_fp).exists()
+    res = _load_pickle_file(temp_fp)
+    assert res == "test success"
+    assert not Path(temp_fp).exists()
