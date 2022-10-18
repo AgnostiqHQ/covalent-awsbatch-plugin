@@ -20,11 +20,9 @@
 
 """Unit tests for AWS batch executor."""
 
-import os
-from base64 import b64encode
 from pathlib import Path
 from typing import Dict, List
-from unittest.mock import ANY, MagicMock
+from unittest.mock import AsyncMock
 
 import cloudpickle
 import pytest
@@ -32,7 +30,7 @@ import pytest
 from covalent_awsbatch_plugin.awsbatch import FUNC_FILENAME, RESULT_FILENAME, AWSBatchExecutor
 
 
-class TestECSExecutor:
+class TestAWSBatchExecutor:
 
     MOCK_PROFILE = "my_profile"
     MOCK_S3_BUCKET_NAME = "s3-bucket"
@@ -46,7 +44,7 @@ class TestECSExecutor:
     MOCK_GPUS = 1
     MOCK_RETRY_ATTEMPTS = 1
     MOCK_TIME_LIMIT = 1
-    MOCK_POLL_FREQ = 123
+    MOCK_POLL_FREQ = 1
     MOCK_DISPATCH_ID = 112233
     MOCK_NODE_ID = 1
 
@@ -110,18 +108,37 @@ class TestECSExecutor:
         assert executor.poll_freq == self.MOCK_POLL_FREQ
 
     @pytest.mark.asyncio
-    async def test_upload_file(self, mock_executor, mocker):
+    async def test_upload_file_to_s3(self, mock_executor, mocker):
         """Test method to upload file to s3."""
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
 
         def some_function():
             pass
 
-        await mock_executor._upload_task(
-            some_function, ("some_arg"), {"some": "kwarg"}, self.MOCK_TASK_METADATA
+        mock_executor._upload_task_to_s3(
+            some_function,
+            self.MOCK_DISPATCH_ID,
+            self.MOCK_NODE_ID,
+            ("some_arg"),
+            {"some": "kwarg"},
         )
-        boto3_mock.Session().client().upload_file.assert_called_once_with(
-            ANY, self.MOCK_S3_BUCKET_NAME, self.MOCK_FUNC_FILENAME
+        boto3_mock.Session().client().upload_file.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_upload_task(self, mock_executor, mocker):
+        """Test for method to call the upload task method."""
+
+        def some_function(x):
+            return x
+
+        upload_to_s3_mock = mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._upload_task_to_s3",
+            return_value=AsyncMock(),
+        )
+
+        await mock_executor._upload_task(some_function, (1), {}, self.MOCK_TASK_METADATA)
+        upload_to_s3_mock.assert_called_once_with(
+            self.MOCK_DISPATCH_ID, self.MOCK_NODE_ID, some_function, (1), {}
         )
 
     @pytest.mark.asyncio
@@ -175,15 +192,19 @@ class TestECSExecutor:
     @pytest.mark.asyncio
     async def test_get_batch_logstream(self, mock_executor, mocker):
         """Test the method to get the batch logstream."""
+        RETURN_VALUE = {"jobs": [{"container": {"logStreamName": "mockLogStream"}}]}
 
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
         client_mock = boto3_mock.Session().client()
 
-        client_mock.describe_jobs.return_value = {
-            "jobs": [{"container": {"logStreamName": "mockLogStream"}}]
-        }
-        assert await mock_executor._get_batch_logstream("1") == "mockLogStream"
-        client_mock.describe_jobs.assert_called_once_with(jobs=["1"])
+        threadpool_mock = mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch._execute_partial_in_threadpool",
+            return_value=RETURN_VALUE,
+        )
+
+        future = await mock_executor._get_batch_logstream("1")
+        assert future == "mockLogStream"
+        threadpool_mock.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_log_events(self, mock_executor, mocker):
@@ -277,3 +298,11 @@ class TestECSExecutor:
 
         _poll_task_mock.assert_called_once_with(returned_job_id)
         query_result_mock.assert_called_once_with(self.MOCK_TASK_METADATA)
+
+    @pytest.mark.asyncio
+    async def test_submit_task(self, mocker, mock_executor):
+        MOCK_IDENTITY = {"Account": 1234}
+        boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
+        await mock_executor.submit_task(self.MOCK_TASK_METADATA, MOCK_IDENTITY)
+        boto3_mock.Session().client().submit_job.assert_called_once()
+        boto3_mock.Session().client().register_job_definition.assert_called_once()
