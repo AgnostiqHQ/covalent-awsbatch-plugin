@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added license workflow
 
+## [0.19.0] - 2022-10-25
+
+### Changed 
+
+- Updated covalent-aws-plugins version `>=0.7.0rc0`.
+- Cleanup file based method
+
+## [0.18.0] - 2022-10-25
+
+### Changed
+
+- Pinned version of covalent-aws-plugins to 0.5.0rc0 
+
+## [0.17.0] - 2022-10-18
+
+### Changed
+
+- Updated `boto3` calls to make them compatible with the async library.
+
 ### Docs
 
 - Updated docs to include more information about required/optional config values, and provide information about each cloud resource that needs to be provisioned 
