@@ -11,6 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Pinned version of covalent-aws-plugins to 0.5.0rc0 
 
+## [0.17.0] - 2022-10-18
+
+### Changed
+
+- Updated `boto3` calls to make them compatible with the async library.
+
+### Docs
+
+- Updated docs to include more information about required/optional config values, and provide information about each cloud resource that needs to be provisioned 
+
+## [0.16.1] - 2022-10-04
+
+### Fixed
+
+- Store `BASE_COVALENT_AWS_PLUGINS_ONLY` in a temporary file rather than storing it as an environment variable.
+
+## [0.16.0] - 2022-10-04
+
+### Changed
+
+- Setting `BASE_COVALENT_AWS_PLUGINS_ONLY` environment system wide to circumvent `setup.py` subprocesses when installing.
+
+## [0.15.0] - 2022-09-30
+
+### Added
+
+-  Logic to specify that only the base covalent-aws-plugins package is to be installed.
+
 ## [0.14.1] - 2022-09-20
 
 ### Fixed
