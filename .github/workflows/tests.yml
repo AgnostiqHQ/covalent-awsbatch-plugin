@@ -78,7 +78,9 @@ jobs:
         run: pip install covalent --pre
                
       - name: Build distribution
-        run: python setup.py sdist
+        run: |
+          touch /tmp/BASE_COVALENT_AWS_PLUGINS_ONLY
+          python setup.py sdist
 
       - name: Validate plugin
         run: |
@@ -90,6 +92,7 @@ jobs:
 
       - name: Install Batch plugin
         run: |
+          touch /tmp/BASE_COVALENT_AWS_PLUGINS_ONLY
           VERSION="$(cat ./VERSION)"
           pip install ./dist/covalent-awsbatch-plugin-${VERSION}.tar.gz
 
