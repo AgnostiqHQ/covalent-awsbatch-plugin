@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.19.0] - 2022-10-25
+
 ### Changed 
 
 - Updated covalent-aws-plugins version `>=0.7.0rc0`.
