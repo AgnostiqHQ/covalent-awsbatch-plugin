@@ -38,9 +38,6 @@ with open("requirements.txt") as f:
 
     required = [git_match_requirement(req) for req in f.read().splitlines()]
 
-with open("/tmp/BASE_COVALENT_AWS_PLUGINS_ONLY", "w") as f:
-    f.write("True")
-
 plugins_list = ["awsbatch = covalent_awsbatch_plugin.awsbatch"]
 
 setup_info = {
@@ -85,4 +82,8 @@ setup_info = {
 }
 
 if __name__ == "__main__":
+    with open("/tmp/BASE_COVALENT_AWS_PLUGINS_ONLY", "w") as f:
+        f.write("True")
     setup(**setup_info)
+    if os.path.exists("/tmp/BASE_COVALENT_AWS_PLUGINS_ONLY"):
+        os.remove("/tmp/BASE_COVALENT_AWS_PLUGINS_ONLY")
