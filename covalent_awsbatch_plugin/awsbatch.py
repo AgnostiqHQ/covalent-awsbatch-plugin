@@ -251,8 +251,9 @@ class AWSBatchExecutor(AWSExecutor):
                 "value": RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id),
             },
         ]
-        jobDefinitionName = f"{dispatch_id}{node_id}"
+        jobDefinitionName = f"{dispatch_id}-{node_id}"
         app_log.debug(f"Job Definition: {jobDefinitionName}")
+        app_log.debug("Job Environment:")
         app_log.debug(env)
         partial_func = partial(
             batch.register_job_definition,
@@ -282,15 +283,16 @@ class AWSBatchExecutor(AWSExecutor):
             },
             platformCapabilities=["EC2"],
         )
-        await _execute_partial_in_threadpool(partial_func)
-        sleep(1)
+        registered_job_definition = await _execute_partial_in_threadpool(partial_func)
+        app_log.debug("Registered Job Definition:")
+        app_log.debug(registered_job_definition)
 
         # Submit the job
         partial_func = partial(
             batch.submit_job,
             jobName=JOB_NAME.format(dispatch_id=dispatch_id, node_id=node_id),
             jobQueue=self.batch_queue,
-            jobDefinition=self.batch_job_definition_name,
+            jobDefinition=jobDefinitionName,
         )
         response = await _execute_partial_in_threadpool(partial_func)
         return response["jobId"]
