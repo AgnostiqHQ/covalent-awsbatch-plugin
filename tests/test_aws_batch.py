@@ -69,7 +69,6 @@ class TestAWSBatchExecutor:
             "profile": self.MOCK_PROFILE,
             "s3_bucket_name": self.MOCK_S3_BUCKET_NAME,
             "batch_queue": self.MOCK_BATCH_QUEUE,
-            "batch_job_definition_name": self.MOCK_JOB_DEF_NAME,
             "batch_execution_role_name": self.MOCK_EXECUTION_ROLE,
             "batch_job_role_name": self.MOCK_JOB_ROLE,
             "batch_job_log_group_name": self.MOCK_LOG_GROUP_NAME,
@@ -96,7 +95,6 @@ class TestAWSBatchExecutor:
         assert executor.profile == self.MOCK_PROFILE
         assert executor.s3_bucket_name == self.MOCK_S3_BUCKET_NAME
         assert executor.batch_queue == self.MOCK_BATCH_QUEUE
-        assert executor.batch_job_definition_name == self.MOCK_JOB_DEF_NAME
         assert executor.execution_role == self.MOCK_EXECUTION_ROLE
         assert executor.batch_job_role_name == self.MOCK_JOB_ROLE
         assert executor.log_group_name == self.MOCK_LOG_GROUP_NAME
