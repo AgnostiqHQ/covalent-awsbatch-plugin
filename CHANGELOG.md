@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Fixed
+
+- Fixed parallel execution of electrons submitting jobs to batch
+
 ## [0.20.0] - 2022-10-27
 
 ### Changed 
