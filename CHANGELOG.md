@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed 
+
+- Updated tag of hardcoded ECR URI to `stable`
+
 ## [0.19.0] - 2022-10-25
 
 ### Changed 
