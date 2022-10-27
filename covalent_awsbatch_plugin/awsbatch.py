@@ -42,7 +42,6 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "profile": os.environ.get("AWS_PROFILE") or "default",
     "s3_bucket_name": "covalent-batch-job-resources",
     "batch_queue": "covalent-batch-queue",
-    "batch_job_definition_name": "covalent-batch-jobs",
     "batch_execution_role_name": "ecsTaskExecutionRole",
     "batch_job_role_name": "CovalentBatchJobRole",
     "batch_job_log_group_name": "covalent-batch-job-logs",
@@ -71,7 +70,6 @@ class AWSBatchExecutor(AWSExecutor):
         profile: Name of an AWS profile whose credentials are used.
         s3_bucket_name: Name of an S3 bucket where objects are stored.
         batch_queue: Name of the Batch queue used for job management.
-        batch_job_definition_name: Name of the Batch job definition for a user, project, or experiment.
         batch_execution_role_name: Name of the IAM role used by the Batch ECS agent.
         batch_job_role_name: Name of the IAM role used within the container.
         batch_job_log_group_name: Name of the CloudWatch log group where container logs are stored.
@@ -90,7 +88,6 @@ class AWSBatchExecutor(AWSExecutor):
         profile: str = None,
         s3_bucket_name: str = None,
         batch_queue: str = None,
-        batch_job_definition_name: str = None,
         batch_execution_role_name: str = None,
         batch_job_role_name: str = None,
         batch_job_log_group_name: str = None,
@@ -115,9 +112,6 @@ class AWSBatchExecutor(AWSExecutor):
         )
 
         self.batch_queue = batch_queue or get_config("executors.awsbatch.batch_queue")
-        self.batch_job_definition_name = batch_job_definition_name or get_config(
-            "executors.awsbatch.batch_job_definition_name"
-        )
         self.batch_job_role_name = batch_job_role_name or get_config(
             "executors.awsbatch.batch_job_role_name"
         )
@@ -137,7 +131,6 @@ class AWSBatchExecutor(AWSExecutor):
             "region": self.region,
             "credentials": self.credentials_file,
             "batch_queue": self.batch_queue,
-            "batch_job_definition_name": self.batch_job_definition_name,
             "batch_job_role_name": self.batch_job_role_name,
             "batch_job_log_group_name": self.log_group_name,
             "batch_execution_role_name": self.execution_role,
@@ -239,7 +232,8 @@ class AWSBatchExecutor(AWSExecutor):
             ]
 
         # Register the job definition
-        self._debug_log(f"Registering job definition {self.batch_job_definition_name}...")
+        jobDefinitionName = f"{dispatch_id}-{node_id}"
+        self._debug_log(f"Registering job definition {jobDefinitionName}...")
         env = [
             {"name": "S3_BUCKET_NAME", "value": self.s3_bucket_name},
             {
@@ -251,8 +245,6 @@ class AWSBatchExecutor(AWSExecutor):
                 "value": RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id),
             },
         ]
-        jobDefinitionName = f"{dispatch_id}-{node_id}"
-        app_log.debug(f"Job Definition: {jobDefinitionName}")
         app_log.debug("Job Environment:")
         app_log.debug(env)
         partial_func = partial(
