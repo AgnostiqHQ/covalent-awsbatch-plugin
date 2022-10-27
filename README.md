@@ -41,7 +41,6 @@ deps_pip = ct.DepsPip(
 
 executor = ct.executor.AWSBatchExecutor(
     s3_bucket_name = "covalent-batch-qa-job-resources",
-    batch_job_definition_name = "covalent-batch-qa-job-definition",
     batch_queue = "covalent-batch-qa-queue",
     batch_execution_role_name = "ecsTaskExecutionRole",
     batch_job_role_name = "covalent-batch-qa-job-role",
