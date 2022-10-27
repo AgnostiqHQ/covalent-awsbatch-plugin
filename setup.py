@@ -82,6 +82,4 @@ setup_info = {
 }
 
 if __name__ == "__main__":
-    with open("/tmp/BASE_COVALENT_AWS_PLUGINS_ONLY", "w") as f:
-        f.write("True")
     setup(**setup_info)

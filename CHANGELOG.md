@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Operations
+
+- Added license workflow
+
+## [0.20.1] - 2022-10-27
+
+### Fixed
+
+- Fixed parallel execution of electrons submitting jobs to batch
+
+## [0.20.0] - 2022-10-27
+
+### Changed 
+
+- Updated tag of hardcoded ECR URI to `stable`
+
+## [0.19.0] - 2022-10-25
+
+### Changed 
+
+- Updated covalent-aws-plugins version `>=0.7.0rc0`.
+- Cleanup file based method
+
+## [0.18.0] - 2022-10-25
+
+### Changed
+
+- Pinned version of covalent-aws-plugins to 0.5.0rc0 
+
 ## [0.17.0] - 2022-10-18
 
 ### Changed
