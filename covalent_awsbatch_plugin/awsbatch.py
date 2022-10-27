@@ -25,6 +25,7 @@ import os
 import tempfile
 from functools import partial
 from pathlib import Path
+from time import sleep
 from typing import Any, Callable, Dict, List, Tuple
 
 import boto3
@@ -239,22 +240,26 @@ class AWSBatchExecutor(AWSExecutor):
 
         # Register the job definition
         self._debug_log(f"Registering job definition {self.batch_job_definition_name}...")
+        env = [
+            {"name": "S3_BUCKET_NAME", "value": self.s3_bucket_name},
+            {
+                "name": "COVALENT_TASK_FUNC_FILENAME",
+                "value": FUNC_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id),
+            },
+            {
+                "name": "RESULT_FILENAME",
+                "value": RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id),
+            },
+        ]
+        jobDefinitionName = f"{dispatch_id}{node_id}"
+        app_log.debug(f"Job Definition: {jobDefinitionName}")
+        app_log.debug(env)
         partial_func = partial(
             batch.register_job_definition,
-            jobDefinitionName=self.batch_job_definition_name,
+            jobDefinitionName=jobDefinitionName,
             type="container",  # Assumes a single EC2 instance will be used
             containerProperties={
-                "environment": [
-                    {"name": "S3_BUCKET_NAME", "value": self.s3_bucket_name},
-                    {
-                        "name": "COVALENT_TASK_FUNC_FILENAME",
-                        "value": FUNC_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id),
-                    },
-                    {
-                        "name": "RESULT_FILENAME",
-                        "value": RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id),
-                    },
-                ],
+                "environment": env,
                 "image": COVALENT_EXEC_BASE_URI,
                 "jobRoleArn": f"arn:aws:iam::{account}:role/{self.batch_job_role_name}",
                 "executionRoleArn": f"arn:aws:iam::{account}:role/{self.execution_role}",
@@ -278,6 +283,7 @@ class AWSBatchExecutor(AWSExecutor):
             platformCapabilities=["EC2"],
         )
         await _execute_partial_in_threadpool(partial_func)
+        sleep(1)
 
         # Submit the job
         partial_func = partial(
