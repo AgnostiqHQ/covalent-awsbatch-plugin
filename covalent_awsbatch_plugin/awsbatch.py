@@ -129,6 +129,7 @@ class AWSBatchExecutor(AWSExecutor):
             "profile": self.profile,
             "region": self.region,
             "credentials": self.credentials_file,
+            "s3_bucket_name": self.s3_bucket_name,
             "batch_queue": self.batch_queue,
             "batch_job_role_name": self.batch_job_role_name,
             "batch_job_log_group_name": self.log_group_name,
