@@ -19,39 +19,23 @@
 # Relief from the License may be granted by purchasing a commercial license.
 
 
-import sys
+import os
 
-import covalent as ct
+from covalent_awsbatch_plugin.awsbatch import AWSBatchExecutor
 
-# Extract terraform outputs & instantiate executor
-import executor_instance
+executor_config = {
+    "s3_bucket_name": os.getenv("executor_s3_bucket_name"),
+    "ecr_repo_name": os.getenv("executor_ecr_repo_name"),
+    "batch_job_definition_name": os.getenv("executor_batch_job_definition_name"),
+    "batch_queue": os.getenv("executor_batch_queue"),
+    "batch_execution_role_name": os.getenv("executor_batch_execution_role_name"),
+    "batch_job_role_name": os.getenv("executor_batch_job_role_name"),
+    "batch_job_log_group_name": os.getenv("executor_batch_job_log_group_name"),
+    "vcpu": os.getenv("executor_vcpu", 2),
+    "memory": os.getenv("executor_memory", 3.75),
+}
 
-# Basic Workflow
+print("Using Executor Configuration:")
+print(executor_config)
 
-
-@ct.electron(executor=executor_instance.executor)
-def join_words(a, b):
-    return ", ".join([a, b])
-
-
-@ct.electron
-def excitement(a):
-    return f"{a}!"
-
-
-@ct.lattice
-def basic_workflow(a, b):
-    phrase = join_words(a, b)
-    return excitement(phrase)
-
-
-# Dispatch the workflow
-dispatch_id = ct.dispatch(basic_workflow)("Hello", "World")
-result = ct.get_result(dispatch_id=dispatch_id, wait=True)
-status = str(result.status)
-
-print(result)
-
-if status == str(ct.status.FAILED):
-    print("Basic Workflow failed to run.")
-    sys.exit(1)
+executor = AWSBatchExecutor(**executor_config)
