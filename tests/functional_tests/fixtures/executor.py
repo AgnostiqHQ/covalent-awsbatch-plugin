@@ -18,6 +18,9 @@
 #
 # Relief from the License may be granted by purchasing a commercial license.
 
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import os
 
