@@ -21,5 +21,5 @@ Fill in the configuration values either manually or from terraform output.
 ### 2. Run Functional Tests
 
 ```sh
-pytest -vvs ./tests/functional_tests/
+pytest -vvs -m functional_tests
 ```
