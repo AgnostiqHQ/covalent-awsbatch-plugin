@@ -58,7 +58,9 @@ EXECUTOR_PLUGIN_NAME = "AWSBatchExecutor"
 FUNC_FILENAME = "func-{dispatch_id}-{node_id}.pkl"
 RESULT_FILENAME = "result-{dispatch_id}-{node_id}.pkl"
 JOB_NAME = "covalent-batch-{dispatch_id}-{node_id}"
-COVALENT_EXEC_BASE_URI = "public.ecr.aws/covalent/covalent-executor-base:stable"
+COVALENT_EXEC_BASE_URI = os.getenv(
+    "COVALENT_EXEC_BASE_URI", "public.ecr.aws/covalent/covalent-executor-base:stable"
+)
 
 
 class AWSBatchExecutor(AWSExecutor):
@@ -244,9 +246,13 @@ class AWSBatchExecutor(AWSExecutor):
                 "name": "RESULT_FILENAME",
                 "value": RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id),
             },
+            {"name": "S3_DATA_BUCKET_NAME", "value": "bitedata"},
+            {"name": "COVALENT_DATA_WORKDIR", "value": "/covalent/data"},
         ]
         app_log.debug("Job Environment:")
         app_log.debug(env)
+
+        app_log.debug(f"Using base image: {COVALENT_EXEC_BASE_URI}")
         partial_func = partial(
             batch.register_job_definition,
             jobDefinitionName=jobDefinitionName,
@@ -266,6 +272,24 @@ class AWSBatchExecutor(AWSExecutor):
                         "awslogs-stream-prefix": "covalent-batch",
                     },
                 },
+                "user": "root",
+                "mountPoints": [
+                    {"sourceVolume": "aws-batch-test", "containerPath": "/covalent/data"}
+                ],
+                "volumes": [
+                    {
+                        "name": "aws-batch-test",
+                        "efsVolumeConfiguration": {
+                            "fileSystemId": "fs-08fbc0678403f63ad",
+                            "rootDirectory": "/",
+                            "transitEncryption": "ENABLED",
+                            "authorizationConfig": {
+                                "accessPointId": "fsap-02c8733cd9ace785e",
+                                "iam": "ENABLED",
+                            },
+                        },
+                    }
+                ],
             },
             retryStrategy={
                 "attempts": self.retry_attempts,
