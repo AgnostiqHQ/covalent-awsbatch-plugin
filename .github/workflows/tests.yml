@@ -95,7 +95,7 @@ jobs:
         shell: python
 
       - name: Run tests
-        run: PYTHONPATH=$PWD/tests pytest -vv tests/ --cov=covalent_awsbatch_plugin
+        run: PYTHONPATH=$PWD/tests pytest -m "not functional_tests" -vv tests/ --cov=covalent_awsbatch_plugin
 
       - name: Generate coverage report
         run: coverage xml -o coverage.xml
