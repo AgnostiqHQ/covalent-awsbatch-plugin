@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Removed hardcoded region, updated functional test executor fixture to include region, and added .env.example 
+
+## [0.25.0] - 2022-11-22
+
+### Changed
+
 - Not setting default values for profile, region, and credentials_file
 
 ## [0.24.0] - 2022-11-15
