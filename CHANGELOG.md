@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.26.0] - 2022-11-22
+
 ### Changed
 
 - Removed hardcoded region, updated functional test executor fixture to include region, and added .env.example 
