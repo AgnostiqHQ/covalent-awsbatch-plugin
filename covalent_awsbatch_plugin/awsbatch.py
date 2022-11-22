@@ -36,9 +36,9 @@ from covalent_aws_plugins import AWSExecutor
 from .utils import _execute_partial_in_threadpool, _load_pickle_file
 
 _EXECUTOR_PLUGIN_DEFAULTS = {
-    "credentials": os.environ.get("AWS_SHARED_CREDENTIALS_FILE")
-    or os.path.join(os.environ["HOME"], ".aws/credentials"),
-    "profile": os.environ.get("AWS_PROFILE") or "default",
+    "credentials": "",
+    "profile": "",
+    "region": "",
     "s3_bucket_name": "covalent-batch-job-resources",
     "batch_queue": "covalent-batch-queue",
     "batch_execution_role_name": "ecsTaskExecutionRole",
@@ -85,6 +85,7 @@ class AWSBatchExecutor(AWSExecutor):
         self,
         credentials: str = None,
         profile: str = None,
+        region: str = None,
         s3_bucket_name: str = None,
         batch_queue: str = None,
         batch_execution_role_name: str = None,
@@ -99,6 +100,7 @@ class AWSBatchExecutor(AWSExecutor):
         **kwargs,
     ):
         super().__init__(
+            region=region or get_config("executors.awsbatch.region"),
             credentials_file=credentials or get_config("executors.awsbatch.credentials"),
             profile=profile or get_config("executors.awsbatch.profile"),
             s3_bucket_name=s3_bucket_name or get_config("executors.awsbatch.s3_bucket_name"),

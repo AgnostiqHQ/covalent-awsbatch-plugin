@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- Not setting default values for profile, region, and credentials_file
+
 ## [0.24.0] - 2022-11-15
 
 ### Changed
