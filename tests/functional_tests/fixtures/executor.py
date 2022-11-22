@@ -27,6 +27,7 @@ import os
 from covalent_awsbatch_plugin.awsbatch import AWSBatchExecutor
 
 executor_config = {
+    "region": os.getenv("executor_region"),
     "s3_bucket_name": os.getenv("executor_s3_bucket_name"),
     "ecr_repo_name": os.getenv("executor_ecr_repo_name"),
     "batch_job_definition_name": os.getenv("executor_batch_job_definition_name"),
