@@ -262,7 +262,7 @@ class AWSBatchExecutor(AWSExecutor):
                 "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                        "awslogs-region": "us-east-1",
+                        "awslogs-region": self.region,
                         "awslogs-group": self.log_group_name,
                         "awslogs-create-group": "true",
                         "awslogs-stream-prefix": "covalent-batch",
