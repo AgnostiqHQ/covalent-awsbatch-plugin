@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- Moved creation of temp directory outside constructor (client side) so it can be run on dispatcher side
+
 ## [0.26.0] - 2022-11-22
 
 ### Changed
