@@ -140,7 +140,7 @@ class AWSBatchExecutor(AWSExecutor):
             "num_gpus": self.num_gpus,
             "retry_attempts": self.retry_attempts,
             "time_limit": self.time_limit,
-            "cache_dir": self.cache_dir
+            "cache_dir": self.cache_dir,
         }
 
         self._debug_log("Starting AWS Batch Executor with config:")
