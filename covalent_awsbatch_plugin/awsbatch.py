@@ -121,7 +121,6 @@ class AWSBatchExecutor(AWSExecutor):
         self.num_gpus = num_gpus or get_config("executors.awsbatch.num_gpus")
         self.retry_attempts = retry_attempts or get_config("executors.awsbatch.retry_attempts")
         self.time_limit = time_limit or get_config("executors.awsbatch.time_limit")
-        self._cwd = tempfile.mkdtemp()
 
         self.cache_dir = self.cache_dir or get_config("executors.awsbatch.cache_dir")
 
@@ -141,12 +140,13 @@ class AWSBatchExecutor(AWSExecutor):
             "num_gpus": self.num_gpus,
             "retry_attempts": self.retry_attempts,
             "time_limit": self.time_limit,
-            "cache_dir": self.cache_dir,
-            "_cwd": self._cwd,
+            "cache_dir": self.cache_dir
         }
 
         self._debug_log("Starting AWS Batch Executor with config:")
         self._debug_log(config)
+
+        self._cwd = '/tmp'
 
     def _debug_log(self, message):
         app_log.debug(f"AWS Batch Executor: {message}")
