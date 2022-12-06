@@ -220,7 +220,10 @@ class AWSBatchExecutor(AWSExecutor):
         account = identity["Account"]
 
         self._debug_log("Submitting task...")
-        batch = boto3.Session(**self.boto_session_options()).client("batch")
+        boto_session = boto3.Session(**self.boto_session_options())
+        batch = boto_session.client("batch")
+
+        region = boto_session.region_name
 
         resources = [
             {"type": "VCPU", "value": str(int(self.vcpu))},
@@ -263,7 +266,7 @@ class AWSBatchExecutor(AWSExecutor):
                 "logConfiguration": {
                     "logDriver": "awslogs",
                     "options": {
-                        "awslogs-region": self.region,
+                        "awslogs-region": region,
                         "awslogs-group": self.log_group_name,
                         "awslogs-create-group": "true",
                         "awslogs-stream-prefix": "covalent-batch",
