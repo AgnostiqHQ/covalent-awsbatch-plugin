@@ -25,9 +25,6 @@ import pytest
 deps_pip = ct.DepsPip(packages=["numpy==1.22.4", "scikit-learn==1.1.2"])
 
 
-from tests.functional_tests.fixtures.executor import executor
-
-
 @pytest.mark.functional_tests
 def test_basic_workflow():
 
@@ -42,7 +39,7 @@ def test_basic_workflow():
         iris.target = iris.target[perm]
         return iris.data, iris.target
 
-    @ct.electron(executor=executor, deps_pip=deps_pip)
+    @ct.electron(executor="awsbatch", deps_pip=deps_pip)
     def train_svm(data, C, gamma):
         X, y = data
         clf = svm.SVC(C=C, gamma=gamma)

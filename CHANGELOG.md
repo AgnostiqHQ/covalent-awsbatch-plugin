@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- Using executor aliases instead of classes for functional tests
+
 ## [0.28.0] - 2022-12-06
 
 ### Changed
