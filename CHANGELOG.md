@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.28.0] - 2022-12-06
+
 ### Changed
 
 - Using region value directly from boto3 session to configure logging to support cases where user supplied region is empty
