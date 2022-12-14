@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.30.0] - 2022-12-14
+
 ### Changed
 
 - Make Covalent Base Executor image configurable via environment variables.
