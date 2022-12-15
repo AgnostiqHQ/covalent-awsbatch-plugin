@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- Removed references to `.env` file in the functional test README.
+
 ## [0.30.0] - 2022-12-14
 
 ### Changed
