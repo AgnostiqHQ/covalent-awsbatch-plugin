@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Fixed
+
+- Removed trailing references to `self._cwd`
+
 ## [0.31.0] - 2022-12-15
 
 ### Changed
