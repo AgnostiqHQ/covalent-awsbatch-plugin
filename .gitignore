@@ -29,7 +29,12 @@
 *.pkl
 
 # terraform data
-**/.terraform/**
+*.terraform
+*.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.plan
+*.json
 
 # egg info
 **.egg-info/**
