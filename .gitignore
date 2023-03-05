@@ -28,6 +28,9 @@
 # pickle files
 *.pkl
 
+# terraform data
+**/.terraform/**
+
 # egg info
 **.egg-info/**
 
