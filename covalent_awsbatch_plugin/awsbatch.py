@@ -51,6 +51,7 @@ _EXECUTOR_PLUGIN_DEFAULTS = {
     "time_limit": 300,
     "cache_dir": "/tmp/covalent",
     "poll_freq": 10,
+    "tf_dir_path": str(Path(__file__).parent.joinpath("infra")),
 }
 
 EXECUTOR_PLUGIN_NAME = "AWSBatchExecutor"
