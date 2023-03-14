@@ -77,3 +77,60 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/24"
   description = "VPC CIDR range"
 }
+
+
+# Executor missing configuration
+variable credentials {
+  type = string
+  default = ""
+  description = "Path to the AWS shared configuration file"
+}
+
+variable profile {
+  type = string
+  default = ""
+  description = "AWS profile used during execution"
+}
+
+variable vcpus {
+  type = number
+  default = 2
+  description = "Number of vcpus a batch job will consume by default"
+}
+
+variable memory {
+  type = number
+  default = 3.25
+  description = "Memory in GB for the batch job"
+}
+
+variable num_gpus {
+  type = number
+  default = 0
+  description = "Number of GPUS required by the batch job"
+}
+
+variable retry_attempts {
+  type = number
+  default = 3
+  description = "Number of retries to attempt before considering the batch job failed"
+}
+
+variable time_limit {
+  type = number
+  default = 300
+  description = "Number of seconds before the batch job is considered to be timed out"
+}
+
+variable cache_dir {
+  type = string
+  default = "/tmp/covalent"
+  description = "Path on local machine where temporary files are generated"
+}
+
+variable poll_freq {
+  type = number
+  default = 5
+  description = "Frequency with which to poll AWS batch for the result object"
+}
+

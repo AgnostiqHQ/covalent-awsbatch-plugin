@@ -10,7 +10,7 @@ data "aws_iam_policy_document" "assume_role_policy" {
 }
 
 resource "aws_iam_role" "ecs_tasks_execution_role" {
-  name               = "${var.name}-task-execution-role"
+  name               = "${var.prefix}-task-execution-role"
   assume_role_policy = data.aws_iam_policy_document.assume_role_policy.json
 }
 
@@ -25,13 +25,13 @@ resource "aws_iam_role_policy_attachment" "ecs_instance_role" {
 }
 
 resource "aws_iam_instance_profile" "ecs_instance_role" {
-  name = "${var.name}-instance-profile"
+  name = "${var.prefix}-instance-profile"
   role = aws_iam_role.ecs_instance_role.name
 }
 
 
 resource "aws_iam_role" "ecs_instance_role" {
-  name = "${var.name}-instance-role"
+  name = "${var.prefix}-instance-role"
 
   assume_role_policy = jsonencode({
     "Version" : "2012-10-17",
@@ -48,7 +48,7 @@ resource "aws_iam_role" "ecs_instance_role" {
 }
 
 resource "aws_iam_role" "aws_batch_service_role" {
-  name = "${var.name}-service-role"
+  name = "${var.prefix}-service-role"
 
   assume_role_policy = jsonencode({
     "Version" : "2012-10-17",
@@ -70,7 +70,7 @@ resource "aws_iam_role_policy_attachment" "aws_batch_service_role_attachment" {
 }
 
 resource "aws_iam_role_policy" "job_policy" {
-  name = "${var.name}-job-policy"
+  name = "${var.prefix}-job-policy"
   role = aws_iam_role.job_role.id
 
   policy = jsonencode({
@@ -135,7 +135,7 @@ resource "aws_iam_role_policy" "job_policy" {
 }
 
 resource "aws_iam_role" "job_role" {
-  name = "${var.name}-job-role"
+  name = "${var.prefix}-job-role"
 
   assume_role_policy = jsonencode({
     "Version" : "2012-10-17",
