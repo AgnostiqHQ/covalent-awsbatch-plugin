@@ -3,7 +3,7 @@ module "vpc" {
 
   create_vpc = (var.vpc_id == "")
 
-  name = "${var.name}-vpc"
+  name = "${var.prefix}-vpc"
   cidr = var.vpc_cidr
 
   azs = ["${var.aws_region}a"]
@@ -19,7 +19,7 @@ module "vpc" {
 }
 
 resource "aws_security_group" "sg" {
-  name = "${var.name}-sg"
+  name = "${var.prefix}-sg"
   description = "Allow traffic to Covalent server"
   vpc_id = "${var.vpc_id == "" ? module.vpc.vpc_id : var.vpc_id}"
 

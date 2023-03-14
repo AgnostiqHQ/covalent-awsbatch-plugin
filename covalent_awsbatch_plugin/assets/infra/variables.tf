@@ -18,7 +18,7 @@
 #
 # Relief from the License may be granted by purchasing a commercial license.
 
-variable "name" {
+variable "prefix" {
   default = "covalent-batch-ft"
   description = "Prefix used for all created AWS Resources"
 }

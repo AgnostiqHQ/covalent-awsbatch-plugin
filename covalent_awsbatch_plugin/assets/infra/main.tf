@@ -25,7 +25,7 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "bucket" {
-  bucket = "${var.name}-${var.aws_s3_bucket}"
+  bucket = "${var.prefix}-${var.aws_s3_bucket}"
   force_destroy = true
 }
 
@@ -35,7 +35,7 @@ resource "aws_s3_bucket_acl" "bucket_acl" {
 }
 
 resource "aws_batch_compute_environment" "compute_environment" {
-  compute_environment_name = "${var.name}-compute-environment"
+  compute_environment_name = "${var.prefix}-compute-environment"
 
   compute_resources {
     instance_role = aws_iam_instance_profile.ecs_instance_role.arn
@@ -55,7 +55,7 @@ resource "aws_batch_compute_environment" "compute_environment" {
   depends_on   = [aws_iam_role_policy_attachment.aws_batch_service_role_attachment]
 }
 resource "aws_batch_job_queue" "job_queue" {
-  name     = "${var.name}-${var.aws_batch_queue}"
+  name     = "${var.prefix}-${var.aws_batch_queue}"
   state    = "ENABLED"
   priority = 1
   compute_environments = [
@@ -64,10 +64,10 @@ resource "aws_batch_job_queue" "job_queue" {
 }
 
 resource "aws_cloudwatch_log_group" "log_group" {
-  name = "${var.name}-log-group"
+  name = "${var.prefix}-log-group"
 }
 
 resource "aws_cloudwatch_log_stream" "log_stream" {
-  name           = "${var.name}-log-stream"
+  name           = "${var.prefix}-log-stream"
   log_group_name = aws_cloudwatch_log_group.log_group.name
 }

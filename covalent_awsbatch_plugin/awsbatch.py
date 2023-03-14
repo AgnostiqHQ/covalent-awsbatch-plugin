@@ -152,10 +152,6 @@ class AWSBatchExecutor(AWSExecutor):
         app_log.debug(f"AWS Batch Executor: {message}")
 
     async def run(self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict):
-
-        # temporary directory for downloading result file
-        self._cwd = tempfile.mkdtemp()
-
         dispatch_id = task_metadata["dispatch_id"]
         node_id = task_metadata["node_id"]
 
@@ -388,7 +384,7 @@ class AWSBatchExecutor(AWSExecutor):
         node_id = task_metadata["node_id"]
 
         result_filename = RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
-        local_result_filename = os.path.join(self._cwd, result_filename)
+        local_result_filename = os.path.join(self.cache_dir, result_filename)
 
         app_log.debug(
             f"Downloading result file {result_filename} from S3 bucket {self.s3_bucket_name} to local path {local_result_filename}..."
