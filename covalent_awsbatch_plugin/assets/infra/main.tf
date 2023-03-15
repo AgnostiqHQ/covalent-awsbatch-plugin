@@ -39,7 +39,7 @@ resource "aws_batch_compute_environment" "compute_environment" {
 
   compute_resources {
     instance_role = aws_iam_instance_profile.ecs_instance_role.arn
-    instance_type = var.instance_types
+    instance_type = [var.instance_types]
     max_vcpus = var.max_vcpus
     min_vcpus = var.min_vcpus
 

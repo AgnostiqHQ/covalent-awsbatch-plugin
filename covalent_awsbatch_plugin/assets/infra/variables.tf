@@ -40,11 +40,9 @@ variable "subnet_id" {
 }
 
 variable "instance_types" {
-  type = list
+  type = string
   description = "Instance type used for Covalent"
-  default     = [
-    "optimal"
-  ]
+  default     = "optimal"
 }
 
 variable "min_vcpus" {

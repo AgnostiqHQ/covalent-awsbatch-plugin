@@ -25,36 +25,68 @@ import os
 import tempfile
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple, Optional
 
 import boto3
 import cloudpickle as pickle
 from covalent._shared_files.config import get_config
 from covalent._shared_files.logger import app_log
 from covalent_aws_plugins import AWSExecutor
+from pydantic import BaseModel
 
 from .utils import _execute_partial_in_threadpool, _load_pickle_file
 
-_EXECUTOR_PLUGIN_DEFAULTS = {
-    "credentials": "",
-    "profile": "",
-    "region": "",
-    "s3_bucket_name": "covalent-batch-job-resources",
-    "batch_queue": "covalent-batch-queue",
-    "batch_execution_role_name": "ecsTaskExecutionRole",
-    "batch_job_role_name": "CovalentBatchJobRole",
-    "batch_job_log_group_name": "covalent-batch-job-logs",
-    "vcpu": 2,
-    "memory": 3.75,
-    "num_gpus": 0,
-    "retry_attempts": 3,
-    "time_limit": 300,
-    "cache_dir": "/tmp/covalent",
-    "poll_freq": 10,
-}
+
+class ExecutorPluginDefaults(BaseModel):
+    """
+    Default configuration values for the executor
+    """
+
+    credentials: str = ""
+    profile: str = ""
+    region: str = "us-east-1"
+    s3_bucket_name: str = "covalent-batch-job-resources"
+    batch_queue: str = "covalent-batch-queue"
+    batch_execution_role_name: str = "ecsTaskExecutionRole"
+    batch_job_role_name: str = "covalent-batch-job-role"
+    batch_job_log_group_name: str = "covalent-batch-job-logs"
+    cache_dir: str = "/tmp/covalent"
+    vcpu: int = 2
+    memory: float = 3.75
+    num_gpus: int = 0
+    retry_attempts: int = 3
+    time_limit: int = 300
+    poll_freq: int = 10
+
+
+class ExecutorInfraDefaults(BaseModel):
+    """
+    Configuration values for provisioning AWS Batch cloud  infrastructure
+    """
+
+    prefix: str
+    aws_region: str = "us-east-1"
+    vpc_id: str = ""
+    subnet_id: str = ""
+    instance_types: str = "optimal"
+    min_vcpus: int = 0
+    max_vcpus: int = 256
+    aws_s3_bucket: str = "job-resources"
+    aws_batch_queue: str = "queue"
+    aws_batch_job_definition: str = "job-definition"
+    credentials: Optional[str] = ""
+    profile: Optional[str] = ""
+    vcpus: Optional[int] = 2
+    memory: Optional[float] = 3.75
+    num_gpus: Optional[int] = 0
+    retry_attempts: Optional[int] = 3
+    time_limit: Optional[int] = 300
+    poll_freq: Optional[int] = 10
+
+
+_EXECUTOR_PLUGIN_DEFAULTS = ExecutorPluginDefaults().dict()
 
 EXECUTOR_PLUGIN_NAME = "AWSBatchExecutor"
-
 FUNC_FILENAME = "func-{dispatch_id}-{node_id}.pkl"
 RESULT_FILENAME = "result-{dispatch_id}-{node_id}.pkl"
 JOB_NAME = "covalent-batch-{dispatch_id}-{node_id}"
