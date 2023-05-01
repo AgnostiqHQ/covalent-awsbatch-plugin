@@ -25,7 +25,7 @@ import os
 import tempfile
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import boto3
 import cloudpickle as pickle
