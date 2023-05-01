@@ -19,8 +19,8 @@
 # Relief from the License may be granted by purchasing a commercial license.
 
 variable "prefix" {
-  default = "covalent-batch-ft"
-  description = "Prefix used for all created AWS Resources"
+  default = "covalent-batch"
+  description = "Prefix used for the AWS Resources created for the executor"
 }
 variable "aws_region" {
   default     = "us-east-1"
@@ -131,4 +131,3 @@ variable poll_freq {
   default = 5
   description = "Frequency with which to poll AWS batch for the result object"
 }
-

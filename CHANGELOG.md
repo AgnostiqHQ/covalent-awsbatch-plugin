@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Added
+
+- Pydantic model validation for Batch executor class parameters.
+- Pydantic model validation for the corresponding Terraform parameters.
+
+### Changed
+
+- Minor updates to the Terraform script such as changing variable `name` to `prefix`.
+
+## [0.32.0] - 2023-03-14
 
 ### Added
 
