@@ -1,8 +1,5 @@
 include VERSION
 include requirements.txt
-<<<<<<< HEAD
 include covalent_awsbatch_plugin/assets/infra/*
 exclude covalent_awsbatch_plugin/assets/infra/*.swp
-=======
 include covalent_awsbatch_plugin/assets/infra/*.tf
->>>>>>> develop

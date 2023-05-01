@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.32.0] - 2023-03-14
 
+
 ### Added
 
 - Adding `terraform` resource provisioning scripts to assets
