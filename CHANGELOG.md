@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.33.0] - 2023-05-02
+
 ### Added
 
 - Pydantic model validation for Batch executor class parameters.
