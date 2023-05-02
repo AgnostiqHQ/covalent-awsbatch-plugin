@@ -240,7 +240,7 @@ class TestAWSBatchExecutor:
         """Test the method to query the result object."""
 
         mock_cwd = tmp_path
-        mock_executor._cwd = mock_cwd.resolve()
+        mock_executor.cache_dir = mock_cwd.resolve()
         mock_local_result_path = mock_cwd / self.MOCK_RESULT_FILENAME
         mock_local_result_path.touch()
 
