@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- Moved infra folder back under assets.
+
 ## [0.34.0] - 2023-05-02
 
 ### Changed
