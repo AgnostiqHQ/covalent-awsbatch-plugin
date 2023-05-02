@@ -29,11 +29,6 @@ resource "aws_s3_bucket" "bucket" {
   force_destroy = true
 }
 
-resource "aws_s3_bucket_acl" "bucket_acl" {
-  bucket = aws_s3_bucket.bucket.id
-  acl    = "private"
-}
-
 resource "aws_batch_compute_environment" "compute_environment" {
   compute_environment_name = "${var.prefix}-compute-environment"
 
