@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.34.0] - 2023-05-02
+
 ### Changed
 
 - In terraform `networking.tf`, `enable_nat_gateway` is set to 'false'.
