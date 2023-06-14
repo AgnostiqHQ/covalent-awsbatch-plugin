@@ -30,6 +30,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import boto3
 import cloudpickle as pickle
 from covalent._shared_files.config import get_config
+from covalent._shared_files.exceptions import TaskCancelledError
 from covalent._shared_files.logger import app_log
 from covalent_aws_plugins import AWSExecutor
 from pydantic import BaseModel
@@ -186,6 +187,7 @@ class AWSBatchExecutor(AWSExecutor):
     async def run(self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict):
         dispatch_id = task_metadata["dispatch_id"]
         node_id = task_metadata["node_id"]
+        batch_job_name = JOB_NAME.format(dispatch_id=dispatch_id, node_id=node_id)
 
         self._debug_log(f"Executing Dispatch ID {dispatch_id} Node {node_id}")
 
@@ -193,9 +195,15 @@ class AWSBatchExecutor(AWSExecutor):
         partial_func = partial(self._validate_credentials, raise_exception=True)
         identity = await _execute_partial_in_threadpool(partial_func)
 
+        if await self.get_cancel_requested():
+            raise TaskCancelledError(f"AWS Batch job {batch_job_name} requested to be cancelled")
         await self._upload_task(function, args, kwargs, task_metadata)
+
+        if await self.get_cancel_requested():
+            raise TaskCancelledError(f"AWS Batch job {batch_job_name} requested to be cancelled")
         job_id = await self.submit_task(task_metadata, identity)
         self._debug_log(f"Successfully submitted job with ID: {job_id}")
+        await self.set_job_handle(handle=job_id)
 
         await self._poll_task(job_id)
         result = await self.query_result(task_metadata)
