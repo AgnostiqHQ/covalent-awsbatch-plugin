@@ -133,7 +133,6 @@ class AWSBatchExecutor(AWSExecutor):
         retry_attempts: int = None,
         time_limit: int = None,
         poll_freq: int = None,
-        **kwargs,
     ):
         super().__init__(
             region=region or get_config("executors.awsbatch.region"),
@@ -145,7 +144,6 @@ class AWSBatchExecutor(AWSExecutor):
             poll_freq=poll_freq or get_config("executors.awsbatch.poll_freq"),
             log_group_name=batch_job_log_group_name
             or get_config("executors.awsbatch.batch_job_log_group_name"),
-            **kwargs,
         )
 
         self.batch_queue = batch_queue or get_config("executors.awsbatch.batch_queue")
