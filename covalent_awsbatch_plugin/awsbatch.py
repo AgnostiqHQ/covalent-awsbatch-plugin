@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import boto3
+import botocore
 import cloudpickle as pickle
 from covalent._shared_files.config import get_config
 from covalent._shared_files.exceptions import TaskCancelledError
@@ -370,21 +371,28 @@ class AWSBatchExecutor(AWSExecutor):
         if exit_code != 0:
             raise Exception(f"Job failed with exit code {exit_code}.")
 
-    async def cancel(self, job_id: str, reason: str = "None") -> None:
-        """Cancel a Batch job.
+    async def cancel(self, task_metadata: Dict, job_handle: str) -> bool:
+        """
+        Cancel the batch job.
 
         Args:
-            job_id: Identifier used to specify a Batch job.
-            reason: An optional string used to specify a cancellation reason.
+            task_metadata: Dictionary with the task's dispatch_id and node id.
+            job_handle: Unique job handle assigned to the task by AWS Batch.
 
         Returns:
-            None
+            If the job was cancelled or not
         """
-
-        self._debug_log("Cancelling job ID {job_id}...")
-        batch = boto3.Session(**self.boto_session_options()).client("batch")
-        partial_func = partial(batch.terminate_job, jobId=job_id, reason=reason)
-        await _execute_partial_in_threadpool(partial_func)
+        self._debug_log("Cancelling job ID {job_handle}...")
+        try:
+            batch = boto3.Session(**self.boto_session_options()).client("batch")
+            partial_func = partial(batch.terminate_job, jobId=job_handle,
+                                   reason=f"Triggered cancellation with {task_metadata}")
+            await _execute_partial_in_threadpool(partial_func)
+            return True
+        except botocore.exceptions.BotoCoreError as error:
+            app_log.debug(f"Failed to cancel AWS Batch job: {job_handle} with \
+                          task_metadata: {task_metadata} with error:{error}")
+            return False
 
     async def _get_log_events(self, log_stream_name: str) -> str:
         """Get log events corresponding to the log group and stream names."""
