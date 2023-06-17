@@ -230,7 +230,7 @@ class TestAWSBatchExecutor:
         mock_dispatch_id = "abcdef"
         mock_node_id = 0
         mock_task_metadata = {"dispatch_id": mock_dispatch_id,
-                                 "node_id": mock_node_id} 
+                                 "node_id": mock_node_id}
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
         client_mock = boto3_mock.Session().client()
 
@@ -238,7 +238,7 @@ class TestAWSBatchExecutor:
                                    job_handle=MOCK_JOB_ID)
         client_mock.terminate_job.assert_called_once_with(
             jobId=MOCK_JOB_ID, reason=f"Triggered cancellation with {mock_task_metadata}")
-    
+
     @pytest.mark.asyncio
     async def test_cancel_failed(self, mock_executor, mocker):
         """Test job cancellation method."""
@@ -247,7 +247,7 @@ class TestAWSBatchExecutor:
         mock_dispatch_id = "abcdef"
         mock_node_id = 0
         mock_task_metadata = {"dispatch_id": mock_dispatch_id,
-                                 "node_id": mock_node_id} 
+                                 "node_id": mock_node_id}
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
         client_mock = boto3_mock.Session().client()
         error = Boto3Error("Could not connect to the endpoint URL: \
