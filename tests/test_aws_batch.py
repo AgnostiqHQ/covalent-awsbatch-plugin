@@ -26,6 +26,7 @@ from unittest.mock import AsyncMock
 
 import cloudpickle
 import pytest
+from boto3.exceptions import Boto3Error
 
 from covalent_awsbatch_plugin.awsbatch import FUNC_FILENAME, RESULT_FILENAME, AWSBatchExecutor
 
@@ -226,13 +227,40 @@ class TestAWSBatchExecutor:
         """Test job cancellation method."""
 
         MOCK_JOB_ID = 1
-        MOCK_CANCELLATION_REASON = "unknown"
+        mock_dispatch_id = "abcdef"
+        mock_node_id = 0
+        mock_task_metadata = {"dispatch_id": mock_dispatch_id,
+                                 "node_id": mock_node_id} 
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
         client_mock = boto3_mock.Session().client()
 
-        await mock_executor.cancel(job_id=MOCK_JOB_ID, reason=MOCK_CANCELLATION_REASON)
+        await mock_executor.cancel(task_metadata=mock_task_metadata,
+                                   job_handle=MOCK_JOB_ID)
         client_mock.terminate_job.assert_called_once_with(
-            jobId=MOCK_JOB_ID, reason=MOCK_CANCELLATION_REASON
+            jobId=MOCK_JOB_ID, reason=f"Triggered cancellation with {mock_task_metadata}")
+    
+    @pytest.mark.asyncio
+    async def test_cancel_failed(self, mock_executor, mocker):
+        """Test job cancellation method."""
+
+        MOCK_JOB_ID = 1
+        mock_dispatch_id = "abcdef"
+        mock_node_id = 0
+        mock_task_metadata = {"dispatch_id": mock_dispatch_id,
+                                 "node_id": mock_node_id} 
+        boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
+        client_mock = boto3_mock.Session().client()
+        error = Boto3Error("Could not connect to the endpoint URL: \
+                                        \"https://batch.us-east-1.amazonaws.com/v1/canceljob\"")
+        client_mock.terminate_job.side_effect = error
+
+        with pytest.raises(Boto3Error) as exception:
+            await mock_executor.cancel(task_metadata=mock_task_metadata,
+                                   job_handle=MOCK_JOB_ID)
+            assert f"Failed to cancel AWS Batch job: {MOCK_JOB_ID} with \
+                          task_metadata: {mock_task_metadata} with error:{error}" == exception
+        client_mock.terminate_job.assert_called_once_with(
+            jobId=MOCK_JOB_ID, reason=f"Triggered cancellation with {mock_task_metadata}"
         )
 
     @pytest.mark.asyncio
@@ -281,6 +309,7 @@ class TestAWSBatchExecutor:
         query_result_mock = mocker.patch(
             "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor.query_result"
         )
+        mock_executor.get_cancel_requested = AsyncMock(return_value=False)
 
         validate_credentials_mock.return_value = MOCK_IDENTITY
 
@@ -291,6 +320,7 @@ class TestAWSBatchExecutor:
         upload_task_mock.assert_called_once_with(mock_func, [], {"x": 1}, self.MOCK_TASK_METADATA)
         validate_credentials_mock.assert_called_once()
         submit_task_mock.assert_called_once_with(self.MOCK_TASK_METADATA, MOCK_IDENTITY)
+        assert get_cancel_requested_mock.call_count == 2
 
         returned_job_id = await submit_task_mock()
 
