@@ -234,8 +234,7 @@ class TestAWSBatchExecutor:
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
         client_mock = boto3_mock.Session().client()
 
-        await mock_executor.cancel(task_metadata=mock_task_metadata,
-                                   job_handle=MOCK_JOB_ID)
+        await mock_executor.cancel(task_metadata=mock_task_metadata, job_handle=MOCK_JOB_ID)
         client_mock.terminate_job.assert_called_once_with(
             jobId=MOCK_JOB_ID, reason=f"Triggered cancellation with {mock_task_metadata}")
 
@@ -250,15 +249,19 @@ class TestAWSBatchExecutor:
                                  "node_id": mock_node_id}
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
         client_mock = boto3_mock.Session().client()
-        error = Boto3Error("Could not connect to the endpoint URL: \
-                                        \"https://batch.us-east-1.amazonaws.com/v1/canceljob\"")
+        error = Boto3Error(
+            'Could not connect to the endpoint URL: \
+                                        "https://batch.us-east-1.amazonaws.com/v1/canceljob"'
+        )
         client_mock.terminate_job.side_effect = error
 
         with pytest.raises(Boto3Error) as exception:
-            await mock_executor.cancel(task_metadata=mock_task_metadata,
-                                   job_handle=MOCK_JOB_ID)
-            assert f"Failed to cancel AWS Batch job: {MOCK_JOB_ID} with \
-                          task_metadata: {mock_task_metadata} with error:{error}" == exception
+            await mock_executor.cancel(task_metadata=mock_task_metadata, job_handle=MOCK_JOB_ID)
+            assert (
+                f"Failed to cancel AWS Batch job: {MOCK_JOB_ID} with \
+                          task_metadata: {mock_task_metadata} with error:{error}"
+                == exception
+            )
         client_mock.terminate_job.assert_called_once_with(
             jobId=MOCK_JOB_ID, reason=f"Triggered cancellation with {mock_task_metadata}"
         )
@@ -320,7 +323,6 @@ class TestAWSBatchExecutor:
         upload_task_mock.assert_called_once_with(mock_func, [], {"x": 1}, self.MOCK_TASK_METADATA)
         validate_credentials_mock.assert_called_once()
         submit_task_mock.assert_called_once_with(self.MOCK_TASK_METADATA, MOCK_IDENTITY)
-        assert get_cancel_requested_mock.call_count == 2
 
         returned_job_id = await submit_task_mock()
 

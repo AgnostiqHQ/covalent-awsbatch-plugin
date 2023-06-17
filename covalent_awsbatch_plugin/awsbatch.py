@@ -385,13 +385,18 @@ class AWSBatchExecutor(AWSExecutor):
         self._debug_log("Cancelling job ID {job_handle}...")
         try:
             batch = boto3.Session(**self.boto_session_options()).client("batch")
-            partial_func = partial(batch.terminate_job, jobId=job_handle,
-                                   reason=f"Triggered cancellation with {task_metadata}")
+            partial_func = partial(
+                batch.terminate_job,
+                jobId=job_handle,
+                reason=f"Triggered cancellation with {task_metadata}",
+            )
             await _execute_partial_in_threadpool(partial_func)
             return True
         except botocore.exceptions.BotoCoreError as error:
-            app_log.debug(f"Failed to cancel AWS Batch job: {job_handle} with \
-                          task_metadata: {task_metadata} with error:{error}")
+            app_log.debug(
+                f"Failed to cancel AWS Batch job: {job_handle} with \
+                          task_metadata: {task_metadata} with error:{error}"
+            )
             return False
 
     async def _get_log_events(self, log_stream_name: str) -> str:
