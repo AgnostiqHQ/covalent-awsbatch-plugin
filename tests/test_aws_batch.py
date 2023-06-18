@@ -319,6 +319,7 @@ class TestAWSBatchExecutor:
             "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor.query_result"
         )
         mock_executor.get_cancel_requested = AsyncMock(return_value=False)
+        mock_executor.set_job_handle = AsyncMock()
 
         validate_credentials_mock.return_value = MOCK_IDENTITY
 
