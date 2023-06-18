@@ -233,8 +233,9 @@ class TestAWSBatchExecutor:
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
         client_mock = boto3_mock.Session().client()
 
-        status = await mock_executor.cancel(task_metadata=mock_task_metadata,
-                                            job_handle=MOCK_JOB_ID)
+        status = await mock_executor.cancel(
+            task_metadata=mock_task_metadata, job_handle=MOCK_JOB_ID
+        )
         client_mock.terminate_job.assert_called_once_with(
             jobId=MOCK_JOB_ID, reason=f"Triggered cancellation with {mock_task_metadata}"
         )
@@ -257,7 +258,9 @@ class TestAWSBatchExecutor:
         client_mock.terminate_job.side_effect = error
 
         with pytest.raises(Boto3Error) as exception:
-            status = await mock_executor.cancel(task_metadata=mock_task_metadata, job_handle=MOCK_JOB_ID)
+            status = await mock_executor.cancel(
+                task_metadata=mock_task_metadata, job_handle=MOCK_JOB_ID
+            )
             assert (
                 f"Failed to cancel AWS Batch job: {MOCK_JOB_ID} with \
                           task_metadata: {mock_task_metadata} with error:{error}"
