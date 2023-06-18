@@ -24,9 +24,9 @@ from pathlib import Path
 from typing import Dict, List
 from unittest.mock import AsyncMock
 
-from boto3.exceptions import Boto3Error
 import cloudpickle
 import pytest
+from boto3.exceptions import Boto3Error
 
 from covalent_awsbatch_plugin.awsbatch import FUNC_FILENAME, RESULT_FILENAME, AWSBatchExecutor
 
