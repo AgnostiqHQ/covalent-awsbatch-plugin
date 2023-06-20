@@ -193,7 +193,7 @@ class TestAWSBatchExecutor:
 
         with pytest.raises(TaskCancelledError) as error:
             await mock_executor._poll_task(job_id="1")
-        
+
         assert str(error.value) == "Job id 1 is cancelled."
         get_status_mock.assert_called()
 
