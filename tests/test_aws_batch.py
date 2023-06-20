@@ -27,9 +27,14 @@ from unittest.mock import AsyncMock
 import cloudpickle
 import pytest
 from botocore.exceptions import ClientError
-
-from covalent_awsbatch_plugin.awsbatch import FUNC_FILENAME, JOB_NAME, RESULT_FILENAME, AWSBatchExecutor
 from covalent._shared_files.exceptions import TaskCancelledError
+
+from covalent_awsbatch_plugin.awsbatch import (
+    FUNC_FILENAME,
+    JOB_NAME,
+    RESULT_FILENAME,
+    AWSBatchExecutor,
+)
 
 
 class TestAWSBatchExecutor:
