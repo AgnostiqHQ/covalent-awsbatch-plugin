@@ -28,7 +28,8 @@ import cloudpickle
 import pytest
 from botocore.exceptions import ClientError
 
-from covalent_awsbatch_plugin.awsbatch import FUNC_FILENAME, RESULT_FILENAME, AWSBatchExecutor
+from covalent_awsbatch_plugin.awsbatch import FUNC_FILENAME, JOB_NAME, RESULT_FILENAME, AWSBatchExecutor
+from covalent._shared_files.exceptions import TaskCancelledError
 
 
 class TestAWSBatchExecutor:
@@ -48,6 +49,7 @@ class TestAWSBatchExecutor:
     MOCK_POLL_FREQ = 1
     MOCK_DISPATCH_ID = 112233
     MOCK_NODE_ID = 1
+    MOCK_BATCH_JOB_NAME = JOB_NAME.format(dispatch_id=MOCK_DISPATCH_ID, node_id=MOCK_NODE_ID)
 
     @property
     def MOCK_FUNC_FILENAME(self):
@@ -335,6 +337,58 @@ class TestAWSBatchExecutor:
 
         _poll_task_mock.assert_called_once_with(returned_job_id)
         query_result_mock.assert_called_once_with(self.MOCK_TASK_METADATA)
+
+    @pytest.mark.asyncio
+    async def test_run_cancel_before_upload(self, mocker, mock_executor):
+        """Test the run method when cancel is requested before uploading to S3"""
+
+        MOCK_IDENTITY = {"Account": 1234}
+
+        def mock_func(x):
+            return x
+
+        validate_credentials_mock = mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._validate_credentials"
+        )
+        validate_credentials_mock.return_value = MOCK_IDENTITY
+        mock_executor.get_cancel_requested = AsyncMock(return_value=True)
+
+        with pytest.raises(TaskCancelledError) as exception:
+            await mock_executor.run(
+                function=mock_func, args=[], kwargs={"x": 1}, task_metadata=self.MOCK_TASK_METADATA
+            )
+            assert exception == f"AWS Batch job {self.MOCK_BATCH_JOB_NAME} requested to be cancelled"
+
+        validate_credentials_mock.assert_called_once()
+        mock_executor.get_cancel_requested.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_run_cancel_before_submit_task(self, mocker, mock_executor):
+        """Test the run method when cancel is requested before submitting task to AWS Batch."""
+
+        MOCK_IDENTITY = {"Account": 1234}
+
+        def mock_func(x):
+            return x
+
+        validate_credentials_mock = mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._validate_credentials"
+        )
+        validate_credentials_mock.return_value = MOCK_IDENTITY
+        mock_executor.get_cancel_requested = AsyncMock(side_effect=[False, True])
+        upload_task_mock = mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._upload_task"
+        )
+
+        with pytest.raises(TaskCancelledError) as exception:
+            await mock_executor.run(
+                function=mock_func, args=[], kwargs={"x": 1}, task_metadata=self.MOCK_TASK_METADATA
+            )
+            assert exception == f"AWS Batch job {self.MOCK_BATCH_JOB_NAME} requested to be cancelled"
+
+        validate_credentials_mock.assert_called_once()
+        upload_task_mock.assert_called_once_with(mock_func, [], {"x": 1}, self.MOCK_TASK_METADATA)
+        assert mock_executor.get_cancel_requested.call_count == 2
 
     @pytest.mark.asyncio
     async def test_submit_task(self, mocker, mock_executor):
