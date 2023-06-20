@@ -28,8 +28,10 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import boto3
+import botocore
 import cloudpickle as pickle
 from covalent._shared_files.config import get_config
+from covalent._shared_files.exceptions import TaskCancelledError
 from covalent._shared_files.logger import app_log
 from covalent_aws_plugins import AWSExecutor
 from pydantic import BaseModel
@@ -184,6 +186,7 @@ class AWSBatchExecutor(AWSExecutor):
     async def run(self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict):
         dispatch_id = task_metadata["dispatch_id"]
         node_id = task_metadata["node_id"]
+        batch_job_name = JOB_NAME.format(dispatch_id=dispatch_id, node_id=node_id)
 
         self._debug_log(f"Executing Dispatch ID {dispatch_id} Node {node_id}")
 
@@ -191,9 +194,15 @@ class AWSBatchExecutor(AWSExecutor):
         partial_func = partial(self._validate_credentials, raise_exception=True)
         identity = await _execute_partial_in_threadpool(partial_func)
 
+        if await self.get_cancel_requested():
+            raise TaskCancelledError(f"AWS Batch job {batch_job_name} requested to be cancelled")
         await self._upload_task(function, args, kwargs, task_metadata)
+
+        if await self.get_cancel_requested():
+            raise TaskCancelledError(f"AWS Batch job {batch_job_name} requested to be cancelled")
         job_id = await self.submit_task(task_metadata, identity)
         self._debug_log(f"Successfully submitted job with ID: {job_id}")
+        await self.set_job_handle(handle=job_id)
 
         await self._poll_task(job_id)
         result = await self.query_result(task_metadata)
@@ -353,6 +362,9 @@ class AWSBatchExecutor(AWSExecutor):
 
         status, exit_code = await self.get_status(job_id)
 
+        if status == "CANCELLED":
+            raise TaskCancelledError(f"Job id {job_id} is cancelled.")
+
         while status not in ["SUCCEEDED", "FAILED"]:
             await asyncio.sleep(self.poll_freq)
             status, exit_code = await self.get_status(job_id)
@@ -360,21 +372,33 @@ class AWSBatchExecutor(AWSExecutor):
         if exit_code != 0:
             raise Exception(f"Job failed with exit code {exit_code}.")
 
-    async def cancel(self, job_id: str, reason: str = "None") -> None:
-        """Cancel a Batch job.
+    async def cancel(self, task_metadata: Dict, job_handle: str) -> bool:
+        """
+        Cancel the batch job.
 
         Args:
-            job_id: Identifier used to specify a Batch job.
-            reason: An optional string used to specify a cancellation reason.
+            task_metadata: Dictionary with the task's dispatch_id and node id.
+            job_handle: Unique job handle assigned to the task by AWS Batch.
 
         Returns:
-            None
+            If the job was cancelled or not
         """
-
-        self._debug_log("Cancelling job ID {job_id}...")
-        batch = boto3.Session(**self.boto_session_options()).client("batch")
-        partial_func = partial(batch.terminate_job, jobId=job_id, reason=reason)
-        await _execute_partial_in_threadpool(partial_func)
+        self._debug_log("Cancelling job ID {job_handle}...")
+        try:
+            batch = boto3.Session(**self.boto_session_options()).client("batch")
+            partial_func = partial(
+                batch.terminate_job,
+                jobId=job_handle,
+                reason=f"Triggered cancellation with {task_metadata}",
+            )
+            await _execute_partial_in_threadpool(partial_func)
+            return True
+        except (botocore.exceptions.BotoCoreError, botocore.exceptions.ClientError) as error:
+            app_log.debug(
+                f"Failed to cancel AWS Batch job: {job_handle} with \
+                          task_metadata: {task_metadata} with error:{error}"
+            )
+            return False
 
     async def _get_log_events(self, log_stream_name: str) -> str:
         """Get log events corresponding to the log group and stream names."""
