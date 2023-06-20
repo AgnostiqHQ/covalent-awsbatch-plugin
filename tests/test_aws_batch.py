@@ -267,7 +267,7 @@ class TestAWSBatchExecutor:
             task_metadata=mock_task_metadata, job_handle=MOCK_JOB_ID
         )
 
-        assert is_cancelled == False
+        assert is_cancelled is False
         client_mock.terminate_job.assert_called_once_with(
             jobId=MOCK_JOB_ID, reason=f"Triggered cancellation with {mock_task_metadata}"
         )
