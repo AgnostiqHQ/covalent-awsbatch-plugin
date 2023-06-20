@@ -26,7 +26,7 @@ from unittest.mock import AsyncMock
 
 import cloudpickle
 import pytest
-from boto3.exceptions import Boto3Error
+from botocore.exceptions import ClientError
 
 from covalent_awsbatch_plugin.awsbatch import FUNC_FILENAME, RESULT_FILENAME, AWSBatchExecutor
 
@@ -252,22 +252,14 @@ class TestAWSBatchExecutor:
         mock_task_metadata = {"dispatch_id": mock_dispatch_id, "node_id": mock_node_id}
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
         client_mock = boto3_mock.Session().client()
-        error = Boto3Error(
-            'Could not connect to the endpoint URL: \
-                                        "https://batch.us-east-1.amazonaws.com/v1/canceljob"'
-        )
+        error = ClientError(operation_name="TerminateJob", error_response={'Error': {'Code': 'UnreachableHostException', 'Message': 'Could not connect to the endpoint URL: "https://batch.us-east-1.amazonaws.com/v1/canceljob"'}})
         client_mock.terminate_job.side_effect = error
 
-        with pytest.raises(Boto3Error) as exception:
-            is_cancelled = await mock_executor.cancel(
-                task_metadata=mock_task_metadata, job_handle=MOCK_JOB_ID
-            )
-            assert (
-                f"Failed to cancel AWS Batch job: {MOCK_JOB_ID} with \
-                          task_metadata: {mock_task_metadata} with error:{error}"
-                == exception
-            )
-            assert is_cancelled is False
+        is_cancelled = await mock_executor.cancel(
+            task_metadata=mock_task_metadata, job_handle=MOCK_JOB_ID
+        )
+
+        assert is_cancelled == False
         client_mock.terminate_job.assert_called_once_with(
             jobId=MOCK_JOB_ID, reason=f"Triggered cancellation with {mock_task_metadata}"
         )
