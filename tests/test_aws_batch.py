@@ -252,7 +252,15 @@ class TestAWSBatchExecutor:
         mock_task_metadata = {"dispatch_id": mock_dispatch_id, "node_id": mock_node_id}
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
         client_mock = boto3_mock.Session().client()
-        error = ClientError(operation_name="TerminateJob", error_response={'Error': {'Code': 'UnreachableHostException', 'Message': 'Could not connect to the endpoint URL: "https://batch.us-east-1.amazonaws.com/v1/canceljob"'}})
+        error = ClientError(
+            operation_name="TerminateJob",
+            error_response={
+                "Error": {
+                    "Code": "UnreachableHostException",
+                    "Message": 'Could not connect to the endpoint URL: "https://batch.us-east-1.amazonaws.com/v1/canceljob"',
+                }
+            },
+        )
         client_mock.terminate_job.side_effect = error
 
         is_cancelled = await mock_executor.cancel(
