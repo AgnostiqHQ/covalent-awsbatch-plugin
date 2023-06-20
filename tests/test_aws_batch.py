@@ -183,6 +183,21 @@ class TestAWSBatchExecutor:
         get_status_mock.assert_called()
 
     @pytest.mark.asyncio
+    async def test_poll_task_cancelled(self, mock_executor, mocker):
+        """Test for exception when to poll the batch job."""
+
+        get_status_mock = mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor.get_status",
+            side_effect=[("CANCELLED", 1)],
+        )
+
+        with pytest.raises(TaskCancelledError) as error:
+            await mock_executor._poll_task(job_id="1")
+        
+        assert str(error.value) == "Job id 1 is cancelled."
+        get_status_mock.assert_called()
+
+    @pytest.mark.asyncio
     async def test_download_file_from_s3(self, mock_executor, mocker):
         """Test method to download file from s3 into local file."""
 

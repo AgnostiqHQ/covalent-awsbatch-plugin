@@ -362,6 +362,9 @@ class AWSBatchExecutor(AWSExecutor):
 
         status, exit_code = await self.get_status(job_id)
 
+        if status == "CANCELLED":
+            raise TaskCancelledError(f"Job id {job_id} is cancelled.")
+
         while status not in ["SUCCEEDED", "FAILED"]:
             await asyncio.sleep(self.poll_freq)
             status, exit_code = await self.get_status(job_id)
