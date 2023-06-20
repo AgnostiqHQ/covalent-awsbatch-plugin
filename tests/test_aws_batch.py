@@ -362,7 +362,9 @@ class TestAWSBatchExecutor:
             await mock_executor.run(
                 function=mock_func, args=[], kwargs={"x": 1}, task_metadata=self.MOCK_TASK_METADATA
             )
-            assert exception == f"AWS Batch job {self.MOCK_BATCH_JOB_NAME} requested to be cancelled"
+            assert (
+                exception == f"AWS Batch job {self.MOCK_BATCH_JOB_NAME} requested to be cancelled"
+            )
 
         validate_credentials_mock.assert_called_once()
         mock_executor.get_cancel_requested.assert_called_once()
@@ -389,7 +391,9 @@ class TestAWSBatchExecutor:
             await mock_executor.run(
                 function=mock_func, args=[], kwargs={"x": 1}, task_metadata=self.MOCK_TASK_METADATA
             )
-            assert exception == f"AWS Batch job {self.MOCK_BATCH_JOB_NAME} requested to be cancelled"
+            assert (
+                exception == f"AWS Batch job {self.MOCK_BATCH_JOB_NAME} requested to be cancelled"
+            )
 
         validate_credentials_mock.assert_called_once()
         upload_task_mock.assert_called_once_with(mock_func, [], {"x": 1}, self.MOCK_TASK_METADATA)
