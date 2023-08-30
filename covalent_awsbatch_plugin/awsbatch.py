@@ -38,6 +38,12 @@ from pydantic import BaseModel
 
 from .utils import _execute_partial_in_threadpool, _load_pickle_file
 
+try:
+    # The imported marker also indicates support for QELectrons.
+    from covalent._shared_files.qelectron_utils import _QE_DB_DATA_MARKER
+except ModuleNotFoundError:
+    _QE_DB_DATA_MARKER = None
+
 
 class ExecutorPluginDefaults(BaseModel):
     """
@@ -133,6 +139,7 @@ class AWSBatchExecutor(AWSExecutor):
         retry_attempts: int = None,
         time_limit: int = None,
         poll_freq: int = None,
+        cache_dir: str = None,
     ):
         super().__init__(
             region=region or get_config("executors.awsbatch.region"),
@@ -156,7 +163,7 @@ class AWSBatchExecutor(AWSExecutor):
         self.retry_attempts = retry_attempts or get_config("executors.awsbatch.retry_attempts")
         self.time_limit = time_limit or get_config("executors.awsbatch.time_limit")
 
-        self.cache_dir = self.cache_dir or get_config("executors.awsbatch.cache_dir")
+        self.cache_dir = cache_dir or get_config("executors.awsbatch.cache_dir")
 
         Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
 
@@ -196,17 +203,24 @@ class AWSBatchExecutor(AWSExecutor):
 
         if await self.get_cancel_requested():
             raise TaskCancelledError(f"AWS Batch job {batch_job_name} requested to be cancelled")
+
         await self._upload_task(function, args, kwargs, task_metadata)
 
         if await self.get_cancel_requested():
             raise TaskCancelledError(f"AWS Batch job {batch_job_name} requested to be cancelled")
+
         job_id = await self.submit_task(task_metadata, identity)
         self._debug_log(f"Successfully submitted job with ID: {job_id}")
         await self.set_job_handle(handle=job_id)
 
         await self._poll_task(job_id)
-        result = await self.query_result(task_metadata)
+
+        result, stdout, stderr = await self.query_result(job_id, task_metadata)
         self._debug_log(f"Successfully queried result: {result}")
+
+        print(stdout, end='', file=self.task_stdout)
+        print(stderr, end='', file=self.task_stderr)
+
         return result
 
     def _upload_task_to_s3(self, dispatch_id, node_id, function, args, kwargs) -> None:
@@ -400,21 +414,6 @@ class AWSBatchExecutor(AWSExecutor):
             )
             return False
 
-    async def _get_log_events(self, log_stream_name: str) -> str:
-        """Get log events corresponding to the log group and stream names."""
-        logs = boto3.Session(**self.boto_session_options()).client("logs")
-
-        # TODO: This should be paginated, but the command doesn't support boto3 pagination
-        # Up to 10000 log events can be returned from a single call to get_log_events()
-        partial_func = partial(
-            logs.get_log_events,
-            logGroupName=self.log_group_name,
-            logStreamName=log_stream_name,
-        )
-        future = await _execute_partial_in_threadpool(partial_func)
-        events = future["events"]
-        return "".join(event["message"] + "\n" for event in events)
-
     async def _download_file_from_s3(
         self, s3_bucket_name: str, result_filename: str, local_result_filename: str
     ) -> None:
@@ -425,7 +424,7 @@ class AWSBatchExecutor(AWSExecutor):
         )
         await _execute_partial_in_threadpool(partial_func)
 
-    async def query_result(self, task_metadata: Dict) -> Tuple[Any, str, str]:
+    async def query_result(self, job_id: str, task_metadata: Dict) -> Tuple[Any, str, str]:
         """Query and retrieve a completed job's result.
 
         Args:
@@ -450,11 +449,94 @@ class AWSBatchExecutor(AWSExecutor):
         result = await _execute_partial_in_threadpool(
             partial(_load_pickle_file, local_result_filename)
         )
-        return result
+
+        stdout, stderr = await self._get_outputs_from_log_events(job_id)
+
+        return result, stdout, stderr
+
+    async def _get_outputs_from_log_events(self, job_id: str) -> Tuple[str, str]:
+        """Get log events corresponding to the log group and stream names."""
+        logs = boto3.Session(**self.boto_session_options()).client("logs")
+
+        log_stream_name = await self._get_batch_logstream(job_id)
+
+        # TODO: This should be paginated, but the command doesn't support boto3 pagination
+        # Up to 10000 log events can be returned from a single call to get_log_events()
+        all_log_events = await _execute_partial_in_threadpool(
+            partial(
+                logs.get_log_events,
+                logGroupName=self.log_group_name,
+                logStreamName=log_stream_name,
+            )
+        )
+
+        return self._parse_events(all_log_events)
 
     async def _get_batch_logstream(self, job_id: str) -> str:
         """Get the log stream name corresponding to the batch."""
-        batch = boto3.Session(profile_name=self.profile).client("batch")
-        partial_func = partial(batch.describe_jobs, [job_id])
+        batch = boto3.Session(**self.boto_session_options()).client("batch")
+
+        kwargs = {"jobs": [job_id]}
+        partial_func = partial(batch.describe_jobs, **kwargs)
+
         future = await _execute_partial_in_threadpool(partial_func)
         return future["jobs"][0]["container"]["logStreamName"]
+
+    def _parse_events(self, all_log_events: dict) -> Tuple[str, str]:
+        """
+        Process log events into stings for stdout and stderr.
+
+        This method also handles potential QElectron DB outputs in the log events.
+        The structure of the potential DB outputs is specific to AWS Batch.
+        """
+        log_events = []
+        qelectron_db_events = []
+        parsing_qelectron_db = False
+
+        for event in all_log_events["events"]:
+
+            msg = event["message"]
+            if _QE_DB_DATA_MARKER is None:
+                # Move on. QElectron support is not enabled.
+                log_events.append(msg)
+                continue
+
+            db_start = msg.startswith(_QE_DB_DATA_MARKER)
+            db_end = msg.endswith(_QE_DB_DATA_MARKER)
+
+            if not any([db_start, db_end, parsing_qelectron_db]):
+                # Move on. This is not a QELectron DB event.
+                log_events.append(msg)
+                continue
+
+            # QELectron DB may be split among multiple log events.
+            # NOTE: Assumes only 1 QELectron DB can exist.
+            if db_start and db_end:
+                # DB is not split - append and move on.
+                qelectron_db_events.append(msg)
+
+            elif db_start:
+                # DB is split - append first segment, set flag.
+                qelectron_db_events.append(msg)
+                parsing_qelectron_db = True
+
+            elif db_end:
+                # DB is split - append final segment, unset flag.
+                qelectron_db_events.append(msg)
+                parsing_qelectron_db = False
+
+            elif parsing_qelectron_db:
+                # DB is split - append intermediate segment.
+                qelectron_db_events.append(msg)
+
+            else:
+                # Default.
+                log_events.append(msg)
+
+        # Re-append the parsed QElectron DB output to the log events.
+        log_events.append(''.join(qelectron_db_events))
+
+        stdout = '\n'.join(log_events)
+        stderr = ''
+
+        return stdout, stderr
