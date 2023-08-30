@@ -30,19 +30,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import boto3
 import botocore
 import cloudpickle as pickle
+from covalent._shared_files import TaskCancelledError, TaskRuntimeError
 from covalent._shared_files.config import get_config
-from covalent._shared_files.exceptions import TaskCancelledError
 from covalent._shared_files.logger import app_log
 from covalent_aws_plugins import AWSExecutor
 from pydantic import BaseModel
 
 from .utils import _execute_partial_in_threadpool, _load_pickle_file
-
-try:
-    # The imported marker also indicates support for QELectrons.
-    from covalent._shared_files.qelectron_utils import _QE_DB_DATA_MARKER
-except ModuleNotFoundError:
-    _QE_DB_DATA_MARKER = None
 
 
 class ExecutorPluginDefaults(BaseModel):
@@ -146,11 +140,9 @@ class AWSBatchExecutor(AWSExecutor):
             credentials_file=credentials or get_config("executors.awsbatch.credentials"),
             profile=profile or get_config("executors.awsbatch.profile"),
             s3_bucket_name=s3_bucket_name or get_config("executors.awsbatch.s3_bucket_name"),
-            execution_role=batch_execution_role_name
-            or get_config("executors.awsbatch.batch_execution_role_name"),
+            execution_role=batch_execution_role_name or get_config("executors.awsbatch.batch_execution_role_name"),
             poll_freq=poll_freq or get_config("executors.awsbatch.poll_freq"),
-            log_group_name=batch_job_log_group_name
-            or get_config("executors.awsbatch.batch_job_log_group_name"),
+            log_group_name=batch_job_log_group_name or get_config("executors.awsbatch.batch_job_log_group_name"),
         )
 
         self.batch_queue = batch_queue or get_config("executors.awsbatch.batch_queue")
@@ -213,9 +205,9 @@ class AWSBatchExecutor(AWSExecutor):
         self._debug_log(f"Successfully submitted job with ID: {job_id}")
         await self.set_job_handle(handle=job_id)
 
-        await self._poll_task(job_id)
+        await self._poll_task(job_id, dispatch_id, node_id)
 
-        result, stdout, stderr = await self.query_result(job_id, task_metadata)
+        result, stdout, stderr = await self.query_result(task_metadata)
         self._debug_log(f"Successfully queried result: {result}")
 
         print(stdout, end='', file=self.task_stdout)
@@ -370,7 +362,7 @@ class AWSBatchExecutor(AWSExecutor):
             exit_code = -1
         return status, exit_code
 
-    async def _poll_task(self, job_id: str) -> Any:
+    async def _poll_task(self, job_id: str, dispatch_id: str, node_id: str) -> Any:
         """Poll a Batch job until completion."""
         self._debug_log(f"Polling task with job id {job_id}...")
 
@@ -384,7 +376,13 @@ class AWSBatchExecutor(AWSExecutor):
             status, exit_code = await self.get_status(job_id)
 
         if exit_code != 0:
-            raise Exception(f"Job failed with exit code {exit_code}.")
+            stdout, stderr, traceback_str, exception_cls = await self._download_output(
+                dispatch_id, node_id
+            )
+            print(stdout, end='', file=self.task_stdout)
+            print(stderr, end='', file=self.task_stderr)
+            print(traceback_str, end='', file=self.task_stderr)
+            raise TaskRuntimeError(traceback_str)
 
     async def cancel(self, task_metadata: Dict, job_handle: str) -> bool:
         """
@@ -424,24 +422,16 @@ class AWSBatchExecutor(AWSExecutor):
         )
         await _execute_partial_in_threadpool(partial_func)
 
-    async def query_result(self, job_id: str, task_metadata: Dict) -> Tuple[Any, str, str]:
-        """Query and retrieve a completed job's result.
-
-        Args:
-            task_metadata: Dictionary containing the task dispatch_id and node_id
-
-        Returns:
-            result: The task's result, as a Python object.
-        """
-        dispatch_id = task_metadata["dispatch_id"]
-        node_id = task_metadata["node_id"]
-
+    async def _download_result(self, dispatch_id: str, node_id: str) -> Any:
+        """Download the result file from S3."""
         result_filename = RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
         local_result_filename = os.path.join(self.cache_dir, result_filename)
 
         app_log.debug(
-            f"Downloading result file {result_filename} from S3 bucket {self.s3_bucket_name} to local path {local_result_filename}..."
+            f"Downloading result file {result_filename} from S3 bucket "
+            f"{self.s3_bucket_name} to local path {local_result_filename}..."
         )
+
         await self._download_file_from_s3(
             self.s3_bucket_name, result_filename, local_result_filename
         )
@@ -450,93 +440,46 @@ class AWSBatchExecutor(AWSExecutor):
             partial(_load_pickle_file, local_result_filename)
         )
 
-        stdout, stderr = await self._get_outputs_from_log_events(job_id)
+        return result
 
-        return result, stdout, stderr
+    async def _download_output(self, dispatch_id: str, node_id: str) -> Tuple[str, str, str, Any]:
+        """Download the outputs (stdout, stderr, traceback, exception type) from S3."""
+        result_filename = RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
+        output_filename = result_filename.replace("result", "output")
+        local_output_filename = os.path.join(self.cache_dir, output_filename)
 
-    async def _get_outputs_from_log_events(self, job_id: str) -> Tuple[str, str]:
-        """Get log events corresponding to the log group and stream names."""
-        logs = boto3.Session(**self.boto_session_options()).client("logs")
-
-        log_stream_name = await self._get_batch_logstream(job_id)
-
-        # TODO: This should be paginated, but the command doesn't support boto3 pagination
-        # Up to 10000 log events can be returned from a single call to get_log_events()
-        all_log_events = await _execute_partial_in_threadpool(
-            partial(
-                logs.get_log_events,
-                logGroupName=self.log_group_name,
-                logStreamName=log_stream_name,
-            )
+        app_log.debug(
+            f"Downloading output file {output_filename} from S3 bucket "
+            f"{self.s3_bucket_name} to local path {local_output_filename}..."
         )
 
-        return self._parse_events(all_log_events)
+        await self._download_file_from_s3(
+            self.s3_bucket_name, output_filename, local_output_filename
+        )
 
-    async def _get_batch_logstream(self, job_id: str) -> str:
-        """Get the log stream name corresponding to the batch."""
-        batch = boto3.Session(**self.boto_session_options()).client("batch")
+        stdout, stderr, traceback_str, exception_cls = await _execute_partial_in_threadpool(
+            partial(_load_pickle_file, local_output_filename)
+        )
 
-        kwargs = {"jobs": [job_id]}
-        partial_func = partial(batch.describe_jobs, **kwargs)
+        return stdout, stderr, traceback_str, exception_cls
 
-        future = await _execute_partial_in_threadpool(partial_func)
-        return future["jobs"][0]["container"]["logStreamName"]
+    async def query_result(self, task_metadata: Dict) -> Tuple[Any, str, str]:
+        """Query and retrieve a completed job's result.
 
-    def _parse_events(self, all_log_events: dict) -> Tuple[str, str]:
+        Args:
+            task_metadata: Dictionary containing the task dispatch_id and node_id
+
+        Returns:
+            result, stdout, stderr
         """
-        Process log events into stings for stdout and stderr.
 
-        This method also handles potential QElectron DB outputs in the log events.
-        The structure of the potential DB outputs is specific to AWS Batch.
-        """
-        log_events = []
-        qelectron_db_events = []
-        parsing_qelectron_db = False
+        dispatch_id = task_metadata["dispatch_id"]
+        node_id = task_metadata["node_id"]
 
-        for event in all_log_events["events"]:
+        # Download result file from S3.
+        result = await self._download_result(dispatch_id, node_id)
 
-            msg = event["message"]
-            if _QE_DB_DATA_MARKER is None:
-                # Move on. QElectron support is not enabled.
-                log_events.append(msg)
-                continue
+        # Download the task output data file from S3.
+        stdout, stderr, _, _, = await self._download_output(dispatch_id, node_id)
 
-            db_start = msg.startswith(_QE_DB_DATA_MARKER)
-            db_end = msg.endswith(_QE_DB_DATA_MARKER)
-
-            if not any([db_start, db_end, parsing_qelectron_db]):
-                # Move on. This is not a QELectron DB event.
-                log_events.append(msg)
-                continue
-
-            # QELectron DB may be split among multiple log events.
-            # NOTE: Assumes only 1 QELectron DB can exist.
-            if db_start and db_end:
-                # DB is not split - append and move on.
-                qelectron_db_events.append(msg)
-
-            elif db_start:
-                # DB is split - append first segment, set flag.
-                qelectron_db_events.append(msg)
-                parsing_qelectron_db = True
-
-            elif db_end:
-                # DB is split - append final segment, unset flag.
-                qelectron_db_events.append(msg)
-                parsing_qelectron_db = False
-
-            elif parsing_qelectron_db:
-                # DB is split - append intermediate segment.
-                qelectron_db_events.append(msg)
-
-            else:
-                # Default.
-                log_events.append(msg)
-
-        # Re-append the parsed QElectron DB output to the log events.
-        log_events.append(''.join(qelectron_db_events))
-
-        stdout = '\n'.join(log_events)
-        stderr = ''
-
-        return stdout, stderr
+        return result, stdout, stderr
