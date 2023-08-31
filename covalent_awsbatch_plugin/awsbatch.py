@@ -21,6 +21,7 @@
 """AWS Batch executor plugin for the Covalent dispatcher."""
 
 import asyncio
+import json
 import os
 import tempfile
 from functools import partial
@@ -36,7 +37,7 @@ from covalent._shared_files.logger import app_log
 from covalent_aws_plugins import AWSExecutor
 from pydantic import BaseModel
 
-from .utils import _execute_partial_in_threadpool, _load_pickle_file
+from .utils import _execute_partial_in_threadpool, _load_json_file, _load_pickle_file
 
 
 class ExecutorPluginDefaults(BaseModel):
@@ -378,7 +379,7 @@ class AWSBatchExecutor(AWSExecutor):
             status, exit_code = await self.get_status(job_id)
 
         if exit_code != 0:
-            stdout, stderr, traceback_str, exception_cls = await self._download_output(
+            stdout, stderr, traceback_str, _ = await self._download_io_output(
                 dispatch_id, node_id
             )
             print(stdout, end="", file=self.task_stdout)
@@ -444,26 +445,27 @@ class AWSBatchExecutor(AWSExecutor):
 
         return result
 
-    async def _download_output(self, dispatch_id: str, node_id: str) -> Tuple[str, str, str, Any]:
-        """Download the outputs (stdout, stderr, traceback, exception type) from S3."""
+    async def _download_io_output(self, dispatch_id: str, node_id: str) -> Tuple[str, str, str, str]:
+        """Download the outputs (stdout, stderr, traceback, exception class name) from S3."""
         result_filename = RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
-        output_filename = result_filename.replace("result", "output")
-        local_output_filename = os.path.join(self.cache_dir, output_filename)
+
+        io_output_filename = result_filename.rsplit('.', maxsplit=1)[0]
+        io_output_filename = io_output_filename.replace("result", "io_output") + ".json"
+        local_io_output_filename = os.path.join(self.cache_dir, io_output_filename)
 
         app_log.debug(
-            f"Downloading output file {output_filename} from S3 bucket "
-            f"{self.s3_bucket_name} to local path {local_output_filename}..."
+            f"Downloading output file {io_output_filename} from S3 bucket "
+            f"{self.s3_bucket_name} to local path {local_io_output_filename}..."
         )
 
         await self._download_file_from_s3(
-            self.s3_bucket_name, output_filename, local_output_filename
+            self.s3_bucket_name, io_output_filename, local_io_output_filename
         )
 
-        stdout, stderr, traceback_str, exception_cls = await _execute_partial_in_threadpool(
-            partial(_load_pickle_file, local_output_filename)
+        # stdout, stderr, traceback_str, exception_class_name
+        return await _execute_partial_in_threadpool(
+            partial(_load_json_file, local_io_output_filename)
         )
-
-        return stdout, stderr, traceback_str, exception_cls
 
     async def query_result(self, task_metadata: Dict) -> Tuple[Any, str, str]:
         """Query and retrieve a completed job's result.
@@ -482,6 +484,6 @@ class AWSBatchExecutor(AWSExecutor):
         result = await self._download_result(dispatch_id, node_id)
 
         # Download the task output data file from S3.
-        stdout, stderr = await self._download_output(dispatch_id, node_id)[:2]
+        stdout, stderr = (await self._download_io_output(dispatch_id, node_id))[:2]
 
         return result, stdout, stderr
