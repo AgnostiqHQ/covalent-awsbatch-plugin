@@ -482,11 +482,6 @@ class AWSBatchExecutor(AWSExecutor):
         result = await self._download_result(dispatch_id, node_id)
 
         # Download the task output data file from S3.
-        (
-            stdout,
-            stderr,
-            _,
-            _,
-        ) = await self._download_output(dispatch_id, node_id)
+        stdout, stderr = await self._download_output(dispatch_id, node_id)[:2]
 
         return result, stdout, stderr
