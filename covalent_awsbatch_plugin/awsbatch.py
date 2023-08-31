@@ -140,9 +140,11 @@ class AWSBatchExecutor(AWSExecutor):
             credentials_file=credentials or get_config("executors.awsbatch.credentials"),
             profile=profile or get_config("executors.awsbatch.profile"),
             s3_bucket_name=s3_bucket_name or get_config("executors.awsbatch.s3_bucket_name"),
-            execution_role=batch_execution_role_name or get_config("executors.awsbatch.batch_execution_role_name"),
+            execution_role=batch_execution_role_name
+            or get_config("executors.awsbatch.batch_execution_role_name"),
             poll_freq=poll_freq or get_config("executors.awsbatch.poll_freq"),
-            log_group_name=batch_job_log_group_name or get_config("executors.awsbatch.batch_job_log_group_name"),
+            log_group_name=batch_job_log_group_name
+            or get_config("executors.awsbatch.batch_job_log_group_name"),
         )
 
         self.batch_queue = batch_queue or get_config("executors.awsbatch.batch_queue")
@@ -210,8 +212,8 @@ class AWSBatchExecutor(AWSExecutor):
         result, stdout, stderr = await self.query_result(task_metadata)
         self._debug_log(f"Successfully queried result: {result}")
 
-        print(stdout, end='', file=self.task_stdout)
-        print(stderr, end='', file=self.task_stderr)
+        print(stdout, end="", file=self.task_stdout)
+        print(stderr, end="", file=self.task_stderr)
 
         return result
 
@@ -379,9 +381,9 @@ class AWSBatchExecutor(AWSExecutor):
             stdout, stderr, traceback_str, exception_cls = await self._download_output(
                 dispatch_id, node_id
             )
-            print(stdout, end='', file=self.task_stdout)
-            print(stderr, end='', file=self.task_stderr)
-            print(traceback_str, end='', file=self.task_stderr)
+            print(stdout, end="", file=self.task_stdout)
+            print(stderr, end="", file=self.task_stderr)
+            print(traceback_str, end="", file=self.task_stderr)
             raise TaskRuntimeError(traceback_str)
 
     async def cancel(self, task_metadata: Dict, job_handle: str) -> bool:
@@ -480,6 +482,11 @@ class AWSBatchExecutor(AWSExecutor):
         result = await self._download_result(dispatch_id, node_id)
 
         # Download the task output data file from S3.
-        stdout, stderr, _, _, = await self._download_output(dispatch_id, node_id)
+        (
+            stdout,
+            stderr,
+            _,
+            _,
+        ) = await self._download_output(dispatch_id, node_id)
 
         return result, stdout, stderr
