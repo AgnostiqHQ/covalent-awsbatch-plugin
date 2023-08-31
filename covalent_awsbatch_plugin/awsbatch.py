@@ -379,9 +379,7 @@ class AWSBatchExecutor(AWSExecutor):
             status, exit_code = await self.get_status(job_id)
 
         if exit_code != 0:
-            stdout, stderr, traceback_str, _ = await self._download_io_output(
-                dispatch_id, node_id
-            )
+            stdout, stderr, traceback_str, _ = await self._download_io_output(dispatch_id, node_id)
             print(stdout, end="", file=self.task_stdout)
             print(stderr, end="", file=self.task_stderr)
             print(traceback_str, end="", file=self.task_stderr)
@@ -445,11 +443,13 @@ class AWSBatchExecutor(AWSExecutor):
 
         return result
 
-    async def _download_io_output(self, dispatch_id: str, node_id: str) -> Tuple[str, str, str, str]:
+    async def _download_io_output(
+        self, dispatch_id: str, node_id: str
+    ) -> Tuple[str, str, str, str]:
         """Download the outputs (stdout, stderr, traceback, exception class name) from S3."""
         result_filename = RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
 
-        io_output_filename = result_filename.rsplit('.', maxsplit=1)[0]
+        io_output_filename = result_filename.rsplit(".", maxsplit=1)[0]
         io_output_filename = io_output_filename.replace("result", "io_output") + ".json"
         local_io_output_filename = os.path.join(self.cache_dir, io_output_filename)
 
