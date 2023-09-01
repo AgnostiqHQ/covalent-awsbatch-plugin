@@ -177,9 +177,14 @@ class TestAWSBatchExecutor:
             side_effect=[("RUNNING", 1), ("SUCCEEDED", 0), ("RUNNING", 1), ("FAILED", 2)],
         )
 
-        await mock_executor._poll_task(job_id="1")
+        kwargs = {
+            "dispatch_id": self.MOCK_DISPATCH_ID,
+            "node_id": self.MOCK_NODE_ID,
+        }
+
+        await mock_executor._poll_task(job_id="1", **kwargs)
         with pytest.raises(Exception):
-            await mock_executor._poll_task(job_id="1")
+            await mock_executor._poll_task(job_id="1", **kwargs)
         get_status_mock.assert_called()
 
     @pytest.mark.asyncio
@@ -191,8 +196,13 @@ class TestAWSBatchExecutor:
             side_effect=[("CANCELLED", 1)],
         )
 
+        kwargs = {
+            "dispatch_id": self.MOCK_DISPATCH_ID,
+            "node_id": self.MOCK_NODE_ID,
+        }
+
         with pytest.raises(TaskCancelledError) as error:
-            await mock_executor._poll_task(job_id="1")
+            await mock_executor._poll_task(job_id="1", **kwargs)
 
         assert str(error.value) == "Job id 1 is cancelled."
         get_status_mock.assert_called()
