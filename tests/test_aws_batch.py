@@ -27,7 +27,7 @@ from unittest.mock import AsyncMock
 import cloudpickle
 import pytest
 from botocore.exceptions import ClientError
-from covalent._shared_files.exceptions import TaskCancelledError
+from covalent._shared_files.exceptions import TaskCancelledError, TaskRuntimeError
 
 from covalent_awsbatch_plugin.awsbatch import (
     FUNC_FILENAME,
@@ -205,6 +205,36 @@ class TestAWSBatchExecutor:
             await mock_executor._poll_task(job_id="1", **kwargs)
 
         assert str(error.value) == "Job id 1 is cancelled."
+        get_status_mock.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_poll_task_failed(self, mock_executor, mocker):
+        """Test for exception when to poll the batch job."""
+
+        get_status_mock = mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor.get_status",
+            side_effect=[("FAILED", 1)],
+        )
+
+        stdout = ''
+        stderr = "Exception: some error happened."
+        traceback = f'Traceback (most recent call last):\n  File "/path/to/file", line 1, in module.py\n{stderr}'
+        exception_class_name = "Exception"
+
+        mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._download_io_output",
+            return_value=(stdout, stderr, traceback, exception_class_name),
+        )
+
+        kwargs = {
+            "dispatch_id": self.MOCK_DISPATCH_ID,
+            "node_id": self.MOCK_NODE_ID,
+        }
+
+        with pytest.raises(TaskRuntimeError) as error:
+            await mock_executor._poll_task(job_id="1", **kwargs)
+
+        assert str(error.value) == traceback
         get_status_mock.assert_called()
 
     @pytest.mark.asyncio
