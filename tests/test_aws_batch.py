@@ -216,7 +216,7 @@ class TestAWSBatchExecutor:
             side_effect=[("FAILED", 1)],
         )
 
-        stdout = ''
+        stdout = ""
         stderr = "Exception: some error happened."
         traceback = f'Traceback (most recent call last):\n  File "/path/to/file", line 1, in module.py\n{stderr}'
         exception_class_name = "Exception"
