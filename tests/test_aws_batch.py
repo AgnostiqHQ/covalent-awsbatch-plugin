@@ -279,7 +279,7 @@ class TestAWSBatchExecutor:
         mock_local_result_path = mock_cwd / self.MOCK_RESULT_FILENAME
         mock_local_result_path.touch()
 
-        MOCK_IO_OUTPUT = tuple([''] * 4)
+        MOCK_IO_OUTPUT = tuple([""] * 4)
 
         mocker.patch("covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._download_file_from_s3")
         mocker.patch(
@@ -305,7 +305,7 @@ class TestAWSBatchExecutor:
             return x
 
         # result, stdout, stderr
-        MOCK_RESULT_CONTENTS = "mock_result", '', ''
+        MOCK_RESULT_CONTENTS = "mock_result", "", ""
 
         upload_task_mock = mocker.patch(
             "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._upload_task"
