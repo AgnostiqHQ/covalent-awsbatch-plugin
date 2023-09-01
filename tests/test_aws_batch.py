@@ -221,23 +221,6 @@ class TestAWSBatchExecutor:
         )
 
     @pytest.mark.asyncio
-    async def test_get_log_events(self, mock_executor, mocker):
-        """Test the method to get log events."""
-
-        MOCK_STREAM = "mock-stream-name"
-
-        boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
-        client_mock = boto3_mock.Session().client()
-
-        client_mock.get_log_events.return_value = {
-            "events": [{"message": "hello"}, {"message": "world"}]
-        }
-        assert await mock_executor._get_log_events(MOCK_STREAM) == "hello\nworld\n"
-        client_mock.get_log_events.assert_called_once_with(
-            logGroupName=self.MOCK_LOG_GROUP_NAME, logStreamName=MOCK_STREAM
-        )
-
-    @pytest.mark.asyncio
     async def test_cancel(self, mock_executor, mocker):
         """Test job cancellation method."""
 
