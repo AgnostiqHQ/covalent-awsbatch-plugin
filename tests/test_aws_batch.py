@@ -20,6 +20,8 @@
 
 """Unit tests for AWS batch executor."""
 
+import json
+import tempfile
 from pathlib import Path
 from typing import Dict, List
 from unittest.mock import AsyncMock
@@ -249,6 +251,29 @@ class TestAWSBatchExecutor:
         boto3_mock.Session().client().download_file.assert_called_once_with(
             "mock_s3_bucket_name", "mock_result_filename", "mock_local_result_filename"
         )
+
+    @pytest.mark.asyncio
+    async def test_download_io_output(self, mock_executor, mocker):
+        """Test method to download IO output from S3."""
+
+        io_filename = f"io_output-{self.MOCK_DISPATCH_ID}-{self.MOCK_NODE_ID}.json"
+        tmp_dir = Path(tempfile.gettempdir())
+        boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
+
+        local_io_output_file = tmp_dir / io_filename
+
+        with open(local_io_output_file, "w", encoding="utf-8") as f:
+            json.dump(("mock_stdout", "mock_stderr", None, None), f)
+
+        mock_executor.cache_dir = tmp_dir
+        await mock_executor._download_io_output(self.MOCK_DISPATCH_ID, self.MOCK_NODE_ID)
+
+        boto3_mock.Session().client().download_file.assert_called_once_with(
+            self.MOCK_S3_BUCKET_NAME, io_filename, str(local_io_output_file)
+        )
+
+        # `_load_json_file` inside `_download_io_output` should delete the temp file.
+        assert not local_io_output_file.exists()
 
     @pytest.mark.asyncio
     async def test_cancel(self, mock_executor, mocker):
