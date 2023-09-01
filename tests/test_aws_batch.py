@@ -279,14 +279,19 @@ class TestAWSBatchExecutor:
         mock_local_result_path = mock_cwd / self.MOCK_RESULT_FILENAME
         mock_local_result_path.touch()
 
-        mocker.patch("covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._download_file_from_s3")
-        mocker.patch("covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._get_batch_logstream")
-        mocker.patch("covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._get_log_events")
+        MOCK_IO_OUTPUT = tuple([''] * 4)
 
-        MOCK_RESULT_CONTENTS = "mock_result"
+        mocker.patch("covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._download_file_from_s3")
+        mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._download_io_output",
+            return_value=MOCK_IO_OUTPUT,
+        )
+
+        # result, stdout, stderr
+        MOCK_RESULT_CONTENTS = "mock_result", MOCK_IO_OUTPUT[0], MOCK_IO_OUTPUT[1]
 
         with open(mock_local_result_path, "wb") as f:
-            cloudpickle.dump(MOCK_RESULT_CONTENTS, f)
+            cloudpickle.dump(MOCK_RESULT_CONTENTS[0], f)
 
         assert await mock_executor.query_result(self.MOCK_TASK_METADATA) == MOCK_RESULT_CONTENTS
 
@@ -299,7 +304,8 @@ class TestAWSBatchExecutor:
         def mock_func(x):
             return x
 
-        boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
+        # result, stdout, stderr
+        MOCK_RESULT_CONTENTS = "mock_result", '', ''
 
         upload_task_mock = mocker.patch(
             "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._upload_task"
@@ -314,7 +320,8 @@ class TestAWSBatchExecutor:
             "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._poll_task"
         )
         query_result_mock = mocker.patch(
-            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor.query_result"
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor.query_result",
+            return_value=MOCK_RESULT_CONTENTS,
         )
         mock_executor.get_cancel_requested = AsyncMock(return_value=False)
         mock_executor.set_job_handle = AsyncMock()
@@ -331,7 +338,9 @@ class TestAWSBatchExecutor:
 
         returned_job_id = await submit_task_mock()
 
-        _poll_task_mock.assert_called_once_with(returned_job_id)
+        _poll_task_mock.assert_called_once_with(
+            returned_job_id, self.MOCK_DISPATCH_ID, self.MOCK_NODE_ID
+        )
         query_result_mock.assert_called_once_with(self.MOCK_TASK_METADATA)
 
     @pytest.mark.asyncio
