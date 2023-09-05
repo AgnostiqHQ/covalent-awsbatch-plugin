@@ -20,6 +20,8 @@
 
 """Unit tests for AWS batch executor."""
 
+import json
+import tempfile
 from pathlib import Path
 from typing import Dict, List
 from unittest.mock import AsyncMock
@@ -27,7 +29,7 @@ from unittest.mock import AsyncMock
 import cloudpickle
 import pytest
 from botocore.exceptions import ClientError
-from covalent._shared_files.exceptions import TaskCancelledError
+from covalent._shared_files.exceptions import TaskCancelledError, TaskRuntimeError
 
 from covalent_awsbatch_plugin.awsbatch import (
     FUNC_FILENAME,
@@ -177,9 +179,14 @@ class TestAWSBatchExecutor:
             side_effect=[("RUNNING", 1), ("SUCCEEDED", 0), ("RUNNING", 1), ("FAILED", 2)],
         )
 
-        await mock_executor._poll_task(job_id="1")
+        kwargs = {
+            "dispatch_id": self.MOCK_DISPATCH_ID,
+            "node_id": self.MOCK_NODE_ID,
+        }
+
+        await mock_executor._poll_task(job_id="1", **kwargs)
         with pytest.raises(Exception):
-            await mock_executor._poll_task(job_id="1")
+            await mock_executor._poll_task(job_id="1", **kwargs)
         get_status_mock.assert_called()
 
     @pytest.mark.asyncio
@@ -191,10 +198,45 @@ class TestAWSBatchExecutor:
             side_effect=[("CANCELLED", 1)],
         )
 
+        kwargs = {
+            "dispatch_id": self.MOCK_DISPATCH_ID,
+            "node_id": self.MOCK_NODE_ID,
+        }
+
         with pytest.raises(TaskCancelledError) as error:
-            await mock_executor._poll_task(job_id="1")
+            await mock_executor._poll_task(job_id="1", **kwargs)
 
         assert str(error.value) == "Job id 1 is cancelled."
+        get_status_mock.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_poll_task_failed(self, mock_executor, mocker):
+        """Test for exception when to poll the batch job."""
+
+        get_status_mock = mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor.get_status",
+            side_effect=[("FAILED", 1)],
+        )
+
+        stdout = ""
+        stderr = "Exception: some error happened."
+        traceback = f'Traceback (most recent call last):\n  File "/path/to/file", line 1, in module.py\n{stderr}'
+        exception_class_name = "Exception"
+
+        mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._download_io_output",
+            return_value=(stdout, stderr, traceback, exception_class_name),
+        )
+
+        kwargs = {
+            "dispatch_id": self.MOCK_DISPATCH_ID,
+            "node_id": self.MOCK_NODE_ID,
+        }
+
+        with pytest.raises(TaskRuntimeError) as error:
+            await mock_executor._poll_task(job_id="1", **kwargs)
+
+        assert str(error.value) == traceback
         get_status_mock.assert_called()
 
     @pytest.mark.asyncio
@@ -211,38 +253,27 @@ class TestAWSBatchExecutor:
         )
 
     @pytest.mark.asyncio
-    async def test_get_batch_logstream(self, mock_executor, mocker):
-        """Test the method to get the batch logstream."""
-        RETURN_VALUE = {"jobs": [{"container": {"logStreamName": "mockLogStream"}}]}
+    async def test_download_io_output(self, mock_executor, mocker):
+        """Test method to download IO output from S3."""
 
+        io_filename = f"io_output-{self.MOCK_DISPATCH_ID}-{self.MOCK_NODE_ID}.json"
+        tmp_dir = Path(tempfile.gettempdir())
         boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
-        client_mock = boto3_mock.Session().client()
 
-        threadpool_mock = mocker.patch(
-            "covalent_awsbatch_plugin.awsbatch._execute_partial_in_threadpool",
-            return_value=RETURN_VALUE,
+        local_io_output_file = tmp_dir / io_filename
+
+        with open(local_io_output_file, "w", encoding="utf-8") as f:
+            json.dump(("mock_stdout", "mock_stderr", None, None), f)
+
+        mock_executor.cache_dir = tmp_dir
+        await mock_executor._download_io_output(self.MOCK_DISPATCH_ID, self.MOCK_NODE_ID)
+
+        boto3_mock.Session().client().download_file.assert_called_once_with(
+            self.MOCK_S3_BUCKET_NAME, io_filename, str(local_io_output_file)
         )
 
-        future = await mock_executor._get_batch_logstream("1")
-        assert future == "mockLogStream"
-        threadpool_mock.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_get_log_events(self, mock_executor, mocker):
-        """Test the method to get log events."""
-
-        MOCK_STREAM = "mock-stream-name"
-
-        boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
-        client_mock = boto3_mock.Session().client()
-
-        client_mock.get_log_events.return_value = {
-            "events": [{"message": "hello"}, {"message": "world"}]
-        }
-        assert await mock_executor._get_log_events(MOCK_STREAM) == "hello\nworld\n"
-        client_mock.get_log_events.assert_called_once_with(
-            logGroupName=self.MOCK_LOG_GROUP_NAME, logStreamName=MOCK_STREAM
-        )
+        # `_load_json_file` inside `_download_io_output` should delete the temp file.
+        assert not local_io_output_file.exists()
 
     @pytest.mark.asyncio
     async def test_cancel(self, mock_executor, mocker):
@@ -303,14 +334,19 @@ class TestAWSBatchExecutor:
         mock_local_result_path = mock_cwd / self.MOCK_RESULT_FILENAME
         mock_local_result_path.touch()
 
-        mocker.patch("covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._download_file_from_s3")
-        mocker.patch("covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._get_batch_logstream")
-        mocker.patch("covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._get_log_events")
+        MOCK_IO_OUTPUT = tuple([""] * 4)
 
-        MOCK_RESULT_CONTENTS = "mock_result"
+        mocker.patch("covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._download_file_from_s3")
+        mocker.patch(
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._download_io_output",
+            return_value=MOCK_IO_OUTPUT,
+        )
+
+        # result, stdout, stderr
+        MOCK_RESULT_CONTENTS = "mock_result", MOCK_IO_OUTPUT[0], MOCK_IO_OUTPUT[1]
 
         with open(mock_local_result_path, "wb") as f:
-            cloudpickle.dump(MOCK_RESULT_CONTENTS, f)
+            cloudpickle.dump(MOCK_RESULT_CONTENTS[0], f)
 
         assert await mock_executor.query_result(self.MOCK_TASK_METADATA) == MOCK_RESULT_CONTENTS
 
@@ -323,7 +359,8 @@ class TestAWSBatchExecutor:
         def mock_func(x):
             return x
 
-        boto3_mock = mocker.patch("covalent_awsbatch_plugin.awsbatch.boto3")
+        # result, stdout, stderr
+        MOCK_RESULT_CONTENTS = "mock_result", "", ""
 
         upload_task_mock = mocker.patch(
             "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._upload_task"
@@ -338,7 +375,8 @@ class TestAWSBatchExecutor:
             "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor._poll_task"
         )
         query_result_mock = mocker.patch(
-            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor.query_result"
+            "covalent_awsbatch_plugin.awsbatch.AWSBatchExecutor.query_result",
+            return_value=MOCK_RESULT_CONTENTS,
         )
         mock_executor.get_cancel_requested = AsyncMock(return_value=False)
         mock_executor.set_job_handle = AsyncMock()
@@ -355,7 +393,9 @@ class TestAWSBatchExecutor:
 
         returned_job_id = await submit_task_mock()
 
-        _poll_task_mock.assert_called_once_with(returned_job_id)
+        _poll_task_mock.assert_called_once_with(
+            returned_job_id, self.MOCK_DISPATCH_ID, self.MOCK_NODE_ID
+        )
         query_result_mock.assert_called_once_with(self.MOCK_TASK_METADATA)
 
     @pytest.mark.asyncio

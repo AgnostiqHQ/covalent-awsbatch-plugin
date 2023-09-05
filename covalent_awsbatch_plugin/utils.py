@@ -21,6 +21,7 @@
 """Helper methods for AWS Batch executor plugin."""
 
 import asyncio
+import json
 import os
 
 import cloudpickle as pickle
@@ -35,5 +36,13 @@ def _load_pickle_file(filename):
     """Method to load the pickle file."""
     with open(filename, "rb") as f:
         result = pickle.load(f)
+    os.remove(filename)
+    return result
+
+
+def _load_json_file(filename):
+    """Method to load the json file."""
+    with open(filename, "r", encoding="utf-8") as f:
+        result = json.load(f)
     os.remove(filename)
     return result

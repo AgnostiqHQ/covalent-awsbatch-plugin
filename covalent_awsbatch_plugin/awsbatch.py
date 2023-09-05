@@ -21,6 +21,7 @@
 """AWS Batch executor plugin for the Covalent dispatcher."""
 
 import asyncio
+import json
 import os
 import tempfile
 from functools import partial
@@ -30,13 +31,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import boto3
 import botocore
 import cloudpickle as pickle
+from covalent._shared_files import TaskCancelledError, TaskRuntimeError
 from covalent._shared_files.config import get_config
-from covalent._shared_files.exceptions import TaskCancelledError
 from covalent._shared_files.logger import app_log
 from covalent_aws_plugins import AWSExecutor
 from pydantic import BaseModel
 
-from .utils import _execute_partial_in_threadpool, _load_pickle_file
+from .utils import _execute_partial_in_threadpool, _load_json_file, _load_pickle_file
 
 
 class ExecutorPluginDefaults(BaseModel):
@@ -133,6 +134,7 @@ class AWSBatchExecutor(AWSExecutor):
         retry_attempts: int = None,
         time_limit: int = None,
         poll_freq: int = None,
+        cache_dir: str = None,
     ):
         super().__init__(
             region=region or get_config("executors.awsbatch.region"),
@@ -156,7 +158,7 @@ class AWSBatchExecutor(AWSExecutor):
         self.retry_attempts = retry_attempts or get_config("executors.awsbatch.retry_attempts")
         self.time_limit = time_limit or get_config("executors.awsbatch.time_limit")
 
-        self.cache_dir = self.cache_dir or get_config("executors.awsbatch.cache_dir")
+        self.cache_dir = cache_dir or get_config("executors.awsbatch.cache_dir")
 
         Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
 
@@ -196,17 +198,24 @@ class AWSBatchExecutor(AWSExecutor):
 
         if await self.get_cancel_requested():
             raise TaskCancelledError(f"AWS Batch job {batch_job_name} requested to be cancelled")
+
         await self._upload_task(function, args, kwargs, task_metadata)
 
         if await self.get_cancel_requested():
             raise TaskCancelledError(f"AWS Batch job {batch_job_name} requested to be cancelled")
+
         job_id = await self.submit_task(task_metadata, identity)
         self._debug_log(f"Successfully submitted job with ID: {job_id}")
         await self.set_job_handle(handle=job_id)
 
-        await self._poll_task(job_id)
-        result = await self.query_result(task_metadata)
+        await self._poll_task(job_id, dispatch_id, node_id)
+
+        result, stdout, stderr = await self.query_result(task_metadata)
         self._debug_log(f"Successfully queried result: {result}")
+
+        print(stdout, end="", file=self.task_stdout)
+        print(stderr, end="", file=self.task_stderr)
+
         return result
 
     def _upload_task_to_s3(self, dispatch_id, node_id, function, args, kwargs) -> None:
@@ -356,7 +365,7 @@ class AWSBatchExecutor(AWSExecutor):
             exit_code = -1
         return status, exit_code
 
-    async def _poll_task(self, job_id: str) -> Any:
+    async def _poll_task(self, job_id: str, dispatch_id: str, node_id: str) -> Any:
         """Poll a Batch job until completion."""
         self._debug_log(f"Polling task with job id {job_id}...")
 
@@ -370,7 +379,11 @@ class AWSBatchExecutor(AWSExecutor):
             status, exit_code = await self.get_status(job_id)
 
         if exit_code != 0:
-            raise Exception(f"Job failed with exit code {exit_code}.")
+            stdout, stderr, traceback_str, _ = await self._download_io_output(dispatch_id, node_id)
+            print(stdout, end="", file=self.task_stdout)
+            print(stderr, end="", file=self.task_stderr)
+            print(traceback_str, end="", file=self.task_stderr)
+            raise TaskRuntimeError(traceback_str)
 
     async def cancel(self, task_metadata: Dict, job_handle: str) -> bool:
         """
@@ -400,21 +413,6 @@ class AWSBatchExecutor(AWSExecutor):
             )
             return False
 
-    async def _get_log_events(self, log_stream_name: str) -> str:
-        """Get log events corresponding to the log group and stream names."""
-        logs = boto3.Session(**self.boto_session_options()).client("logs")
-
-        # TODO: This should be paginated, but the command doesn't support boto3 pagination
-        # Up to 10000 log events can be returned from a single call to get_log_events()
-        partial_func = partial(
-            logs.get_log_events,
-            logGroupName=self.log_group_name,
-            logStreamName=log_stream_name,
-        )
-        future = await _execute_partial_in_threadpool(partial_func)
-        events = future["events"]
-        return "".join(event["message"] + "\n" for event in events)
-
     async def _download_file_from_s3(
         self, s3_bucket_name: str, result_filename: str, local_result_filename: str
     ) -> None:
@@ -425,24 +423,16 @@ class AWSBatchExecutor(AWSExecutor):
         )
         await _execute_partial_in_threadpool(partial_func)
 
-    async def query_result(self, task_metadata: Dict) -> Tuple[Any, str, str]:
-        """Query and retrieve a completed job's result.
-
-        Args:
-            task_metadata: Dictionary containing the task dispatch_id and node_id
-
-        Returns:
-            result: The task's result, as a Python object.
-        """
-        dispatch_id = task_metadata["dispatch_id"]
-        node_id = task_metadata["node_id"]
-
+    async def _download_result(self, dispatch_id: str, node_id: str) -> Any:
+        """Download the result file from S3."""
         result_filename = RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
         local_result_filename = os.path.join(self.cache_dir, result_filename)
 
         app_log.debug(
-            f"Downloading result file {result_filename} from S3 bucket {self.s3_bucket_name} to local path {local_result_filename}..."
+            f"Downloading result file {result_filename} from S3 bucket "
+            f"{self.s3_bucket_name} to local path {local_result_filename}..."
         )
+
         await self._download_file_from_s3(
             self.s3_bucket_name, result_filename, local_result_filename
         )
@@ -450,11 +440,50 @@ class AWSBatchExecutor(AWSExecutor):
         result = await _execute_partial_in_threadpool(
             partial(_load_pickle_file, local_result_filename)
         )
+
         return result
 
-    async def _get_batch_logstream(self, job_id: str) -> str:
-        """Get the log stream name corresponding to the batch."""
-        batch = boto3.Session(profile_name=self.profile).client("batch")
-        partial_func = partial(batch.describe_jobs, [job_id])
-        future = await _execute_partial_in_threadpool(partial_func)
-        return future["jobs"][0]["container"]["logStreamName"]
+    async def _download_io_output(
+        self, dispatch_id: str, node_id: str
+    ) -> Tuple[str, str, str, str]:
+        """Download the outputs (stdout, stderr, traceback, exception class name) from S3."""
+        result_filename = RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
+
+        io_output_filename = result_filename.rsplit(".", maxsplit=1)[0]
+        io_output_filename = io_output_filename.replace("result", "io_output") + ".json"
+        local_io_output_filename = os.path.join(self.cache_dir, io_output_filename)
+
+        app_log.debug(
+            f"Downloading output file {io_output_filename} from S3 bucket "
+            f"{self.s3_bucket_name} to local path {local_io_output_filename}..."
+        )
+
+        await self._download_file_from_s3(
+            self.s3_bucket_name, io_output_filename, local_io_output_filename
+        )
+
+        # stdout, stderr, traceback_str, exception_class_name
+        return await _execute_partial_in_threadpool(
+            partial(_load_json_file, local_io_output_filename)
+        )
+
+    async def query_result(self, task_metadata: Dict) -> Tuple[Any, str, str]:
+        """Query and retrieve a completed job's result.
+
+        Args:
+            task_metadata: Dictionary containing the task dispatch_id and node_id
+
+        Returns:
+            result, stdout, stderr
+        """
+
+        dispatch_id = task_metadata["dispatch_id"]
+        node_id = task_metadata["node_id"]
+
+        # Download result file from S3.
+        result = await self._download_result(dispatch_id, node_id)
+
+        # Download the task output data file from S3.
+        stdout, stderr = (await self._download_io_output(dispatch_id, node_id))[:2]
+
+        return result, stdout, stderr

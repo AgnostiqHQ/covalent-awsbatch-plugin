@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Added
+
+- Output stream and exceptions support for AWSBatchExecutor.
+
+- A necessary `cache_dir` argument (in lieu of `**kwargs`, removed by previous).
+
 ## [0.36.0] - 2023-06-20
 
 ### Changed
