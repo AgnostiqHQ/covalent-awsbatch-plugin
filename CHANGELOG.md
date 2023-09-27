@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- Updated the provider version for AWS to 5.17.0
+
 ## [0.38.0] - 2023-09-20
 
 ### Changed
