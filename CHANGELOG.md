@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.39.0] - 2023-10-06
+
 ### Changed
 
 - Updated the terraform provider version for AWS to 5.17.0 (batch plugin)
