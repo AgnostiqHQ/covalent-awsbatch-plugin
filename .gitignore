@@ -120,3 +120,6 @@ ipython_config.py
 **/.terraform.lock.hcl
 **/*.tfvars
 **/*.plan
+
+# Scratch
+*.ipynb
