@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.40.0] - 2023-10-13
+
 ### Changed
 
 - Updated `requirements.txt`, removed boto3 version requirement as it is part of `covalent-aws-plugins`, and update `covalent-aws-plugins` minimum version requirement.
