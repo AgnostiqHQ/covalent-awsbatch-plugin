@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.41.0] - 2023-10-15
+
 ### Changed
 
 - Added `container_image_uri` to `AWSBatchExecutor` to allow for custom container images to be specified via kwargs
