@@ -56,11 +56,12 @@ class ExecutorPluginDefaults(BaseModel):
     retry_attempts: int = 3
     time_limit: int = 300
     poll_freq: int = 10
+    container_image_uri: str = "public.ecr.aws/covalent/covalent-executor-base:stable"
 
 
 class ExecutorInfraDefaults(BaseModel):
     """
-    Configuration values for provisioning AWS Batch cloud  infrastructure
+    Configuration values for provisioning AWS Batch cloud infrastructure
     """
 
     prefix: str
@@ -81,6 +82,7 @@ class ExecutorInfraDefaults(BaseModel):
     retry_attempts: Optional[int] = 3
     time_limit: Optional[int] = 300
     poll_freq: Optional[int] = 10
+    container_image_uri: Optional[str] = "public.ecr.aws/covalent/covalent-executor-base:stable"
 
 
 _EXECUTOR_PLUGIN_DEFAULTS = ExecutorPluginDefaults().dict()
@@ -89,9 +91,6 @@ EXECUTOR_PLUGIN_NAME = "AWSBatchExecutor"
 FUNC_FILENAME = "func-{dispatch_id}-{node_id}.pkl"
 RESULT_FILENAME = "result-{dispatch_id}-{node_id}.pkl"
 JOB_NAME = "covalent-batch-{dispatch_id}-{node_id}"
-COVALENT_EXEC_BASE_URI = os.getenv(
-    "COVALENT_EXEC_BASE_URI", "public.ecr.aws/covalent/covalent-executor-base:stable"
-)
 
 
 class AWSBatchExecutor(AWSExecutor):
@@ -112,6 +111,7 @@ class AWSBatchExecutor(AWSExecutor):
         time_limit: Time limit (in seconds) after which jobs are killed.
         poll_freq: Frequency with which to poll a submitted task.
         cache_dir: Cache directory used by this executor for temporary files.
+        container_image_uri: URI of the docker container image used by the executor.
     """
 
     def __init__(
@@ -131,6 +131,7 @@ class AWSBatchExecutor(AWSExecutor):
         time_limit: int = None,
         poll_freq: int = None,
         cache_dir: str = None,
+        container_image_uri: str = None,
     ):
         super().__init__(
             region=region or get_config("executors.awsbatch.region"),
@@ -153,6 +154,9 @@ class AWSBatchExecutor(AWSExecutor):
         self.num_gpus = num_gpus or get_config("executors.awsbatch.num_gpus")
         self.retry_attempts = retry_attempts or get_config("executors.awsbatch.retry_attempts")
         self.time_limit = time_limit or get_config("executors.awsbatch.time_limit")
+        self.container_image_uri = container_image_uri or get_config(
+            "executors.awsbatch.container_image_uri"
+        )
 
         self.cache_dir = cache_dir or get_config("executors.awsbatch.cache_dir")
 
@@ -173,6 +177,8 @@ class AWSBatchExecutor(AWSExecutor):
             "retry_attempts": self.retry_attempts,
             "time_limit": self.time_limit,
             "cache_dir": self.cache_dir,
+            "poll_freq": self.poll_freq,
+            "container_image_uri": self.container_image_uri,
         }
 
         self._debug_log("Starting AWS Batch Executor with config:")
@@ -301,7 +307,7 @@ class AWSBatchExecutor(AWSExecutor):
             type="container",  # Assumes a single EC2 instance will be used
             containerProperties={
                 "environment": env,
-                "image": COVALENT_EXEC_BASE_URI,
+                "image": self.container_image_uri,
                 "jobRoleArn": f"arn:aws:iam::{account}:role/{self.batch_job_role_name}",
                 "executionRoleArn": f"arn:aws:iam::{account}:role/{self.execution_role}",
                 "resourceRequirements": resources,

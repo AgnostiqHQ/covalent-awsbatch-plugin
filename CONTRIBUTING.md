@@ -21,7 +21,7 @@ conda activate covalent-dev
 Install Covalent's core requirements as well as the pre-commit package:
 ```shell
 conda install setuptools pip
-pip install cova pre-commit
+pip install covalent pre-commit
 pre-commit install
 ```
 
