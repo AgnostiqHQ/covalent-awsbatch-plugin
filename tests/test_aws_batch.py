@@ -50,6 +50,7 @@ class TestAWSBatchExecutor:
     MOCK_RETRY_ATTEMPTS = 1
     MOCK_TIME_LIMIT = 1
     MOCK_POLL_FREQ = 1
+    MOCK_CONTAINER_IMAGE_URI = "container-image-uri"
     MOCK_DISPATCH_ID = 112233
     MOCK_NODE_ID = 1
     MOCK_BATCH_JOB_NAME = JOB_NAME.format(dispatch_id=MOCK_DISPATCH_ID, node_id=MOCK_NODE_ID)
@@ -84,6 +85,7 @@ class TestAWSBatchExecutor:
             "retry_attempts": self.MOCK_RETRY_ATTEMPTS,
             "time_limit": self.MOCK_TIME_LIMIT,
             "poll_freq": self.MOCK_POLL_FREQ,
+            "container_image_uri": self.MOCK_CONTAINER_IMAGE_URI,
         }
 
     @pytest.fixture
@@ -110,6 +112,7 @@ class TestAWSBatchExecutor:
         assert executor.retry_attempts == self.MOCK_RETRY_ATTEMPTS
         assert executor.time_limit == self.MOCK_TIME_LIMIT
         assert executor.poll_freq == self.MOCK_POLL_FREQ
+        assert executor.container_image_uri == self.MOCK_CONTAINER_IMAGE_URI
 
     @pytest.mark.asyncio
     async def test_upload_file_to_s3(self, mock_executor, mocker):

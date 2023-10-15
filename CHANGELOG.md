@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+
+- Added `container_image_uri` to `AWSBatchExecutor` to allow for custom container images to be specified via kwargs
+- Corrected reference to past name in CONTRIBUTING.md
+- Updated .env.example to remove outdated parameter
+
 ## [0.40.0] - 2023-10-13
 
 ### Changed
