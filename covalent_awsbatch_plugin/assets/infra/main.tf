@@ -65,10 +65,9 @@ resource "aws_cloudwatch_log_stream" "log_stream" {
 
 
 # Executor Covalent config section
-data template_file executor_config {
-  template = "${file("${path.module}/awsbatch.conf.tftpl")}"
-
-  vars = {
+resource "local_file" "rest_api_openapi_spec" {
+  filename = "${path.module}/awsbatch.conf"
+  content = templatefile("${path.module}/awsbatch.conf.tftpl", {
     credentials=var.credentials
     profile=var.profile
     region=var.aws_region
@@ -84,10 +83,5 @@ data template_file executor_config {
     time_limit=tonumber(var.time_limit)
     cache_dir=var.cache_dir
     poll_freq=tonumber(var.poll_freq)
-  }
-}
-
-resource local_file executor_config {
-  content = data.template_file.executor_config.rendered
-  filename = "${path.module}/awsbatch.conf"
+  })
 }
