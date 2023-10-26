@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Fixed
+
+- Changed the `prefix` attribute of `ExecutorPluginDefaults` to take a default value
+
 ## [0.41.0] - 2023-10-15
 
 ### Changed
