@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed config file generation from template by using newer `templatefile` for Mac M1 compatibility with terraform
 
+## [0.41.0] - 2023-10-15
+
+### Changed
+
+- Added `container_image_uri` to `AWSBatchExecutor` to allow for custom container images to be specified via kwargs
+- Corrected reference to past name in CONTRIBUTING.md
+- Updated .env.example to remove outdated parameter
+
 ## [0.40.0] - 2023-10-13
 
 ### Changed
