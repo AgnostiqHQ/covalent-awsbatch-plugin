@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.41.1] - 2023-11-01
+
 ### Fixed
 
 - Fixed config file generation from template by using newer `templatefile` for Mac M1 compatibility with terraform
