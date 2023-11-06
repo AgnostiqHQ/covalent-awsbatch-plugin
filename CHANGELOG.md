@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Changed the `prefix` attribute of `ExecutorPluginDefaults` to take a default value
+- Modified the `prefix` attribute from `ExecutorPluginDefaults` to take a default value, since it was causing error while using `deploy` command with infra arguments
 
 ## [0.41.0] - 2023-10-15
 
