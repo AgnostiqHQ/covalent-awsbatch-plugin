@@ -64,7 +64,7 @@ class ExecutorInfraDefaults(BaseModel):
     Configuration values for provisioning AWS Batch cloud infrastructure
     """
 
-    prefix: str
+    prefix: Optional[str] = "covalent-batch"
     aws_region: str = "us-east-1"
     vpc_id: str = ""
     subnet_id: str = ""
