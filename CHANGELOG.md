@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Modified the `prefix` attribute from `ExecutorPluginDefaults` to take a default value, since it was causing error while using `deploy` command with infra arguments
 
+## [0.41.1] - 2023-11-01
+
+### Fixed
+
+- Fixed config file generation from template by using newer `templatefile` for Mac M1 compatibility with terraform
+
 ## [0.41.0] - 2023-10-15
 
 ### Changed
