@@ -1,34 +1,19 @@
-module "vpc" {
-  source = "terraform-aws-modules/vpc/aws"
+resource "aws_default_vpc" "default" {}
 
-  create_vpc = (var.vpc_id == "")
-
-  name = "${var.prefix}-vpc"
-  cidr = var.vpc_cidr
-
-  azs = ["${var.aws_region}a"]
-
-  public_subnets = [
-    cidrsubnet(var.vpc_cidr, 0, 0)
-  ]
-  private_subnets = []
-
-  enable_nat_gateway   = false
-  single_nat_gateway   = false
-  enable_dns_hostnames = true
-  map_public_ip_on_launch = true
+resource "aws_default_subnet" "default" {
+  availability_zone = "${var.aws_region}${var.aws_zone}"
 }
 
 resource "aws_security_group" "sg" {
-  name = "${var.prefix}-sg"
+  name        = "${local.suffix}"
   description = "Allow traffic to Covalent server"
-  vpc_id = "${var.vpc_id == "" ? module.vpc.vpc_id : var.vpc_id}"
+  vpc_id      = local.vpc_id
 
   egress {
     description = "Allow all outbound traffic"
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }

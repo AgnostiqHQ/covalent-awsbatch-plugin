@@ -20,23 +20,36 @@ provider "aws" {
   region = var.aws_region
 }
 
+resource "random_string" "default_suffix" {
+  length  = 9
+  upper   = false
+  special = false
+}
+
+locals {
+  suffix = var.suffix == "" ? random_string.default_suffix.result : var.suffix
+
+  vpc_id    = var.vpc_id == "" ? aws_default_vpc.default.id : var.vpc_id
+  subnet_id = var.subnet_id == "" ? aws_default_subnet.default.id : var.subnet_id
+}
+
 resource "aws_s3_bucket" "bucket" {
-  bucket = "${var.prefix}-${var.aws_s3_bucket}"
+  bucket_prefix = "storage-"
   force_destroy = true
 }
 
 resource "aws_batch_compute_environment" "compute_environment" {
-  compute_environment_name = "${var.prefix}-compute-environment"
+  compute_environment_name = "compute-environment-${local.suffix}"
 
   compute_resources {
     instance_role = aws_iam_instance_profile.ecs_instance_role.arn
     instance_type = [var.instance_types]
-    max_vcpus = var.max_vcpus
-    min_vcpus = var.min_vcpus
+    max_vcpus     = var.max_vcpus
+    min_vcpus     = var.min_vcpus
 
-    security_group_ids = [ aws_security_group.sg.id ]
+    security_group_ids = [aws_security_group.sg.id]
 
-    subnets = [ var.vpc_id == "" ? "${element(module.vpc.public_subnets, 0)}" : var.subnet_id ]
+    subnets = [local.subnet_id]
 
     type = "EC2"
   }
@@ -46,7 +59,7 @@ resource "aws_batch_compute_environment" "compute_environment" {
   depends_on   = [aws_iam_role_policy_attachment.aws_batch_service_role_attachment]
 }
 resource "aws_batch_job_queue" "job_queue" {
-  name     = "${var.prefix}-${var.aws_batch_queue}"
+  name     = "queue-${local.suffix}"
   state    = "ENABLED"
   priority = 1
   compute_environments = [
@@ -55,11 +68,11 @@ resource "aws_batch_job_queue" "job_queue" {
 }
 
 resource "aws_cloudwatch_log_group" "log_group" {
-  name = "${var.prefix}-log-group"
+  name = "log-group-${local.suffix}"
 }
 
 resource "aws_cloudwatch_log_stream" "log_stream" {
-  name           = "${var.prefix}-log-stream"
+  name           = "log-stream-${local.suffix}"
   log_group_name = aws_cloudwatch_log_group.log_group.name
 }
 
@@ -68,20 +81,20 @@ resource "aws_cloudwatch_log_stream" "log_stream" {
 resource "local_file" "rest_api_openapi_spec" {
   filename = "${path.module}/awsbatch.conf"
   content = templatefile("${path.module}/awsbatch.conf.tftpl", {
-    credentials=var.credentials
-    profile=var.profile
-    region=var.aws_region
-    s3_bucket_name=aws_s3_bucket.bucket.id
-    batch_queue=aws_batch_job_queue.job_queue.name
-    batch_execution_role_name=aws_iam_role.ecs_tasks_execution_role.name
-    batch_job_role_name=aws_iam_role.job_role.name
-    batch_job_log_group_name=aws_cloudwatch_log_group.log_group.name
-    vcpu=tonumber(var.vcpus)
-    memory=tonumber(var.memory)
-    num_gpus=tonumber(var.num_gpus)
-    retry_attempts=tonumber(var.retry_attempts)
-    time_limit=tonumber(var.time_limit)
-    cache_dir=var.cache_dir
-    poll_freq=tonumber(var.poll_freq)
+    credentials               = var.credentials
+    profile                   = var.profile
+    region                    = var.aws_region
+    s3_bucket_name            = aws_s3_bucket.bucket.id
+    batch_queue               = aws_batch_job_queue.job_queue.name
+    batch_execution_role_name = aws_iam_role.ecs_tasks_execution_role.name
+    batch_job_role_name       = aws_iam_role.job_role.name
+    batch_job_log_group_name  = aws_cloudwatch_log_group.log_group.name
+    vcpu                      = tonumber(var.vcpus)
+    memory                    = tonumber(var.memory)
+    num_gpus                  = tonumber(var.num_gpus)
+    retry_attempts            = tonumber(var.retry_attempts)
+    time_limit                = tonumber(var.time_limit)
+    cache_dir                 = var.cache_dir
+    poll_freq                 = tonumber(var.poll_freq)
   })
 }

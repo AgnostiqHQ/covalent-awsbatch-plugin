@@ -14,56 +14,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-variable "prefix" {
-  default = "covalent-batch"
-  description = "Prefix used for the AWS Resources created for the executor"
+variable "suffix" {
+  default     = ""
+  description = "suffix used for the AWS Resources created for the executor"
 }
 variable "aws_region" {
   default     = "us-east-1"
   description = "Region in which Covalent is deployed"
 }
 
+variable "aws_zone" {
+  default     = "a"
+  description = "Availability zone in which Covalent is deployed"
+}
+
 variable "vpc_id" {
-  type = string
+  type        = string
   description = "Existing VPC ID"
-  default = ""
+  default     = ""
 }
 
 variable "subnet_id" {
-  type = string
+  type        = string
   description = "Existing subnet ID"
-  default = ""
+  default     = ""
 }
 
 variable "instance_types" {
-  type = string
+  type        = string
   description = "Instance type used for Covalent"
   default     = "optimal"
 }
 
 variable "min_vcpus" {
-  type = number
+  type        = number
   description = "Minimum number of vCPUs to use for Covalent"
   default     = 0
 }
 
 variable "max_vcpus" {
-  type = number
+  type        = number
   description = "Maximum number of vCPUs to use for Covalent"
   default     = 256
 }
 
-variable "aws_s3_bucket" {
-  default     = "job-resources"
-  description = "S3 bucket used for file batch job resources"
-}
-variable "aws_batch_queue" {
-  default = "queue"
-  description = "Batch queue used for jobs"
-}
-
 variable "aws_batch_job_definition" {
-  default = "job-definition"
+  default     = "job-definition"
   description = "Batch queue used for jobs"
 }
 
@@ -74,56 +70,56 @@ variable "vpc_cidr" {
 
 
 # Executor missing configuration
-variable credentials {
-  type = string
-  default = ""
+variable "credentials" {
+  type        = string
+  default     = ""
   description = "Path to the AWS shared configuration file"
 }
 
-variable profile {
-  type = string
-  default = ""
+variable "profile" {
+  type        = string
+  default     = ""
   description = "AWS profile used during execution"
 }
 
-variable vcpus {
-  type = number
-  default = 2
+variable "vcpus" {
+  type        = number
+  default     = 2
   description = "Number of vcpus a batch job will consume by default"
 }
 
-variable memory {
-  type = number
-  default = 3.25
+variable "memory" {
+  type        = number
+  default     = 3.25
   description = "Memory in GB for the batch job"
 }
 
-variable num_gpus {
-  type = number
-  default = 0
+variable "num_gpus" {
+  type        = number
+  default     = 0
   description = "Number of GPUS required by the batch job"
 }
 
-variable retry_attempts {
-  type = number
-  default = 3
+variable "retry_attempts" {
+  type        = number
+  default     = 3
   description = "Number of retries to attempt before considering the batch job failed"
 }
 
-variable time_limit {
-  type = number
-  default = 300
+variable "time_limit" {
+  type        = number
+  default     = 300
   description = "Number of seconds before the batch job is considered to be timed out"
 }
 
-variable cache_dir {
-  type = string
-  default = "/tmp/covalent"
+variable "cache_dir" {
+  type        = string
+  default     = "/tmp/covalent"
   description = "Path on local machine where temporary files are generated"
 }
 
-variable poll_freq {
-  type = number
-  default = 5
+variable "poll_freq" {
+  type        = number
+  default     = 5
   description = "Frequency with which to poll AWS batch for the result object"
 }
