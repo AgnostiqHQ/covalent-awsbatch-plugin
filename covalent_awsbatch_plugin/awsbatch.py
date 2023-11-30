@@ -17,6 +17,7 @@
 """AWS Batch executor plugin for the Covalent dispatcher."""
 
 import asyncio
+from enum import Enum
 import json
 import os
 import tempfile
@@ -27,9 +28,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import boto3
 import botocore
 import cloudpickle as pickle
+from covalent.executor.schemas import ResourceMap, TaskSpec, TaskUpdate
 from covalent._shared_files import TaskCancelledError, TaskRuntimeError
 from covalent._shared_files.config import get_config
 from covalent._shared_files.logger import app_log
+from covalent._shared_files.util_classes import RESULT_STATUS, Status
 from covalent_aws_plugins import AWSExecutor
 from pydantic import BaseModel
 
@@ -88,12 +91,32 @@ class ExecutorInfraDefaults(BaseModel):
 _EXECUTOR_PLUGIN_DEFAULTS = ExecutorPluginDefaults().dict()
 
 EXECUTOR_PLUGIN_NAME = "AWSBatchExecutor"
+
 FUNC_FILENAME = "func-{dispatch_id}-{node_id}.pkl"
-RESULT_FILENAME = "result-{dispatch_id}-{node_id}.pkl"
-JOB_NAME = "covalent-batch-{dispatch_id}-{node_id}"
+RESULT_FILENAME = "{dispatch_id}/{node_id}/result.tobj"
+STDOUT_FILENAME = "{dispatch_id}/{node_id}/stdout.txt"
+STDERR_FILENAME = "{dispatch_id}/{node_id}/stderr.txt"
+QELECTRON_DB_FILENAME = "{dispatch_id}/{node_id}/qelectron_db.mdb"
+SUMMARY_FILENAME = "{dispatch_id}/{node_id}/summary.json"
+
+JOB_NAME = "covalent-batch-{dispatch_id}-{task_group_id}"
+
+
+# Valid Batch job terminal statuses
+class StatusEnum(str, Enum):
+    CANCELLED = "CANCELLED"
+    FAILED = "FAILED"
+    SUCCEEDED = "SUCCEEDED"
+
+
+class ReceiveModel(BaseModel):
+    status: StatusEnum
 
 
 class AWSBatchExecutor(AWSExecutor):
+    # Opt into the new API
+    SUPPORTS_MANAGED_EXECUTION = True
+
     """AWS Batch executor plugin class.
 
     Args:
@@ -188,72 +211,27 @@ class AWSBatchExecutor(AWSExecutor):
         app_log.debug(f"AWS Batch Executor: {message}")
 
     async def run(self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict):
-        dispatch_id = task_metadata["dispatch_id"]
-        node_id = task_metadata["node_id"]
-        batch_job_name = JOB_NAME.format(dispatch_id=dispatch_id, node_id=node_id)
+        raise NotImplementedError
 
-        self._debug_log(f"Executing Dispatch ID {dispatch_id} Node {node_id}")
+    async def submit_task(self):
+        raise NotImplementedError
 
-        self._debug_log("Validating Credentials...")
-        partial_func = partial(self._validate_credentials, raise_exception=True)
-        identity = await _execute_partial_in_threadpool(partial_func)
+    async def _poll_task(self):
+        raise NotImplementedError
 
-        if await self.get_cancel_requested():
-            raise TaskCancelledError(f"AWS Batch job {batch_job_name} requested to be cancelled")
+    async def _upload_task(self):
+        raise NotImplementedError
 
-        await self._upload_task(function, args, kwargs, task_metadata)
+    async def query_result(self):
+        raise NotImplementedError
 
-        if await self.get_cancel_requested():
-            raise TaskCancelledError(f"AWS Batch job {batch_job_name} requested to be cancelled")
-
-        job_id = await self.submit_task(task_metadata, identity)
-        self._debug_log(f"Successfully submitted job with ID: {job_id}")
-        await self.set_job_handle(handle=job_id)
-
-        await self._poll_task(job_id, dispatch_id, node_id)
-
-        result, stdout, stderr = await self.query_result(task_metadata)
-        self._debug_log(f"Successfully queried result: {result}")
-
-        print(stdout, end="", file=self.task_stdout)
-        print(stderr, end="", file=self.task_stderr)
-
-        return result
-
-    def _upload_task_to_s3(self, dispatch_id, node_id, function, args, kwargs) -> None:
-        """
-        Uploads the pickled function to the remote cache.
-        """
-        s3 = boto3.Session(**self.boto_session_options()).client("s3")
-        s3_object_filename = FUNC_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
-
-        self._debug_log(
-            f"Uploading task to S3 bucket {self.s3_bucket_name} as object {s3_object_filename}..."
-        )
-
-        with tempfile.NamedTemporaryFile(dir=self.cache_dir) as function_file:
-            # Write serialized function to file
-            pickle.dump((function, args, kwargs), function_file)
-            function_file.flush()
-            s3.upload_file(function_file.name, self.s3_bucket_name, s3_object_filename)
-
-    async def _upload_task(
-        self, function: Callable, args: List, kwargs: Dict, task_metadata: Dict
-    ):
-        """Wrapper to make boto3 s3 upload calls async."""
-        dispatch_id = task_metadata["dispatch_id"]
-        node_id = task_metadata["node_id"]
-        partial_func = partial(
-            self._upload_task_to_s3,
-            dispatch_id,
-            node_id,
-            function,
-            args,
-            kwargs,
-        )
-        return await _execute_partial_in_threadpool(partial_func)
-
-    async def submit_task(self, task_metadata: Dict, identity: Dict) -> Any:
+    async def submit_task_group(
+        self,
+        task_specs: List[TaskSpec],
+        resource_map: ResourceMap,
+        task_group_metadata: Dict,
+        identity: Dict
+    ) -> Any:
         """
         Invokes the task on the remote backend.
 
@@ -263,8 +241,8 @@ class AWSBatchExecutor(AWSExecutor):
         Return:
             task_uuid: Task UUID defined on the remote backend.
         """
-        dispatch_id = task_metadata["dispatch_id"]
-        node_id = task_metadata["node_id"]
+        dispatch_id = task_group_metadata["dispatch_id"]
+        task_group_id = task_group_metadata["task_group_id"]
         account = identity["Account"]
 
         self._debug_log("Submitting task...")
@@ -285,18 +263,49 @@ class AWSBatchExecutor(AWSExecutor):
                 },
             ]
 
+        COVALENT_TASK_SPECS = json.dumps([t.model_dump() for t in task_specs])
+        COVALENT_RESOURCE_MAP = resource_map.model_dump_json()
+        COVALENT_TASK_GROUP_METADATA = json.dumps(task_group_metadata)
+
+        output_upload_uris = [
+            (
+                f"s3://{self.s3_bucket_name}/{RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=t.function_id)}",
+                f"s3://{self.s3_bucket_name}/{STDOUT_FILENAME.format(dispatch_id=dispatch_id, node_id=t.function_id)}",
+                f"s3://{self.s3_bucket_name}/{STDERR_FILENAME.format(dispatch_id=dispatch_id, node_id=t.function_id)}",
+                f"s3://{self.s3_bucket_name}/{QELECTRON_DB_FILENAME.format(dispatch_id=dispatch_id, node_id=t.function_id)}",
+            )
+            for t in task_specs
+        ]
+        COVALENT_OUTPUT_UPLOAD_URIS = json.dumps(output_upload_uris)
+        summary_upload_uris = [
+            f"s3://{self.s3_bucket_name}/{SUMMARY_FILENAME.format(dispatch_id=dispatch_id, node_id=t.function_id)}"
+            for t in task_specs
+        ]
+        COVALENT_SUMMARY_UPLOAD_URIS = json.dumps(summary_upload_uris)
+
         # Register the job definition
-        jobDefinitionName = f"{dispatch_id}-{node_id}"
+        jobDefinitionName = f"{dispatch_id}-{task_group_id}"
         self._debug_log(f"Registering job definition {jobDefinitionName}...")
         env = [
-            {"name": "S3_BUCKET_NAME", "value": self.s3_bucket_name},
             {
-                "name": "COVALENT_TASK_FUNC_FILENAME",
-                "value": FUNC_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id),
+                "name": "COVALENT_TASK_SPECS",
+                "value": COVALENT_TASK_SPECS,
             },
             {
-                "name": "RESULT_FILENAME",
-                "value": RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id),
+                "name": "COVALENT_RESOURCE_MAP",
+                "value": COVALENT_RESOURCE_MAP,
+            },
+            {
+                "name": "COVALENT_TASK_GROUP_METADATA",
+                "value": COVALENT_TASK_GROUP_METADATA,
+            },
+            {
+                "name": "COVALENT_OUTPUT_UPLOAD_URIS",
+                "value": COVALENT_OUTPUT_UPLOAD_URIS,
+            },
+            {
+                "name": "COVALENT_SUMMARY_UPLOAD_URIS",
+                "value": COVALENT_SUMMARY_UPLOAD_URIS,
             },
         ]
         app_log.debug("Job Environment:")
@@ -336,7 +345,7 @@ class AWSBatchExecutor(AWSExecutor):
         # Submit the job
         partial_func = partial(
             batch.submit_job,
-            jobName=JOB_NAME.format(dispatch_id=dispatch_id, node_id=node_id),
+            jobName=JOB_NAME.format(dispatch_id=dispatch_id, task_group_id=task_group_id),
             jobQueue=self.batch_queue,
             jobDefinition=jobDefinitionName,
         )
@@ -367,25 +376,20 @@ class AWSBatchExecutor(AWSExecutor):
             exit_code = -1
         return status, exit_code
 
-    async def _poll_task(self, job_id: str, dispatch_id: str, node_id: str) -> Any:
+    async def _poll_job(self, job_id: str) -> StatusEnum:
         """Poll a Batch job until completion."""
-        self._debug_log(f"Polling task with job id {job_id}...")
+        self._debug_log(f"Polling Batch job with id {job_id}...")
 
         status, exit_code = await self.get_status(job_id)
 
         if status == "CANCELLED":
-            raise TaskCancelledError(f"Job id {job_id} is cancelled.")
+            return status
 
         while status not in ["SUCCEEDED", "FAILED"]:
             await asyncio.sleep(self.poll_freq)
             status, exit_code = await self.get_status(job_id)
 
-        if exit_code != 0:
-            stdout, stderr, traceback_str, _ = await self._download_io_output(dispatch_id, node_id)
-            print(stdout, end="", file=self.task_stdout)
-            print(stderr, end="", file=self.task_stderr)
-            print(traceback_str, end="", file=self.task_stderr)
-            raise TaskRuntimeError(traceback_str)
+        return status
 
     async def cancel(self, task_metadata: Dict, job_handle: str) -> bool:
         """
@@ -415,77 +419,95 @@ class AWSBatchExecutor(AWSExecutor):
             )
             return False
 
-    async def _download_file_from_s3(
-        self, s3_bucket_name: str, result_filename: str, local_result_filename: str
-    ) -> None:
-        """Download file from s3 into local file."""
+    async def send(
+        self,
+        task_specs: List[TaskSpec],
+        resources: ResourceMap,
+        task_group_metadata: Dict,
+    ):
+
+        dispatch_id = task_group_metadata["dispatch_id"]
+        task_group_id = task_group_metadata["task_group_id"]
+
+        batch_job_name = JOB_NAME.format(dispatch_id=dispatch_id, task_group_id=task_group_id)
+
+        self._debug_log(f"Executing Dispatch ID {dispatch_id} Task Group {task_group_id}")
+
+        self._debug_log("Validating Credentials...")
+        partial_func = partial(self._validate_credentials, raise_exception=True)
+        identity = await _execute_partial_in_threadpool(partial_func)
+
+        if await self.get_cancel_requested():
+            raise TaskCancelledError(f"AWS Batch job {batch_job_name} requested to be cancelled")
+
+        job_id = await self.submit_task_group(task_specs, resources, task_group_metadata, identity)
+        self._debug_log(f"Successfully submitted job with ID: {job_id}")
+        await self.set_job_handle(handle=job_id)
+
+        return job_id
+
+    async def poll(self, task_group_metadata: Dict, job_id: str) -> Dict:
+        return {"status": await self._poll_job(job_id)}
+
+    async def receive(self, task_group_metadata: Dict, data: Any) -> List[TaskUpdate]:
+        # Job should have reached a terminal state by the time this is invoked.
+        dispatch_id = task_group_metadata["dispatch_id"]
+        task_group_id = task_group_metadata["task_group_id"]
+
+        received = ReceiveModel.model_validate(data)
         s3 = boto3.Session(**self.boto_session_options()).client("s3")
-        partial_func = partial(
-            s3.download_file, s3_bucket_name, result_filename, local_result_filename
-        )
-        await _execute_partial_in_threadpool(partial_func)
+        task_updates = []
 
-    async def _download_result(self, dispatch_id: str, node_id: str) -> Any:
-        """Download the result file from S3."""
-        result_filename = RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
-        local_result_filename = os.path.join(self.cache_dir, result_filename)
+        # Try to retrieve whatever task artifacts have been uploaded
+        # Electrons with a complete execution summary are either COMPLETED or FAILED.
+        # Electrons with no execution summary are either FAILED or CANCELLED depending on the overall Batch job status
 
-        app_log.debug(
-            f"Downloading result file {result_filename} from S3 bucket "
-            f"{self.s3_bucket_name} to local path {local_result_filename}..."
-        )
+        for i, node_id in enumerate(task_group_metadata["node_ids"]):
+            summary_filename = SUMMARY_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
 
-        await self._download_file_from_s3(
-            self.s3_bucket_name, result_filename, local_result_filename
-        )
+            try:
+                resp = s3.get_object(Bucket=self.s3_bucket_name, Key=summary_filename)
+                result_summary = json.loads(resp["Body"].read())
+                status = RESULT_STATUS.FAILED if result_summary["exception_occurred"] else RESULT_STATUS.COMPLETED
+                assets = {
+                    "output": {
+                        "remote_uri": result_summary["output_uri"],
+                    },
+                    "stdout": {
+                        "remote_uri": result_summary["stdout_uri"],
+                    },
+                    "stderr": {
+                        "remote_uri": result_summary["stderr_uri"],
+                    },
+                    "qelectron_db": {
+                        "remote_uri": result_summary["qelectron_db_uri"],
+                    },
+                }
+                update = {
+                    "dispatch_id": dispatch_id,
+                    "node_id": node_id,
+                    "status": status,
+                    "assets": assets,
+                }
+                task_updates.append(TaskUpdate(**update))
 
-        result = await _execute_partial_in_threadpool(
-            partial(_load_pickle_file, local_result_filename)
-        )
+            except s3.exceptions.NoSuchKey:
+                for j in range(i, len(task_group_metadata["node_ids"])):
+                    status = RESULT_STATUS.CANCELLED if received.status == StatusEnum.CANCELLED else RESULT_STATUS.FAILED
+                    update = {
+                        "dispatch_id": dispatch_id,
+                        "node_id": task_group_metadata["node_ids"][j],
+                        "status": status,
+                        "assets": {}
+                    }
+                    task_updates.append(TaskUpdate(**update))
+                    break
 
-        return result
+        return task_updates
 
-    async def _download_io_output(
-        self, dispatch_id: str, node_id: str
-    ) -> Tuple[str, str, str, str]:
-        """Download the outputs (stdout, stderr, traceback, exception class name) from S3."""
-        result_filename = RESULT_FILENAME.format(dispatch_id=dispatch_id, node_id=node_id)
-
-        io_output_filename = result_filename.rsplit(".", maxsplit=1)[0]
-        io_output_filename = io_output_filename.replace("result", "io_output") + ".json"
-        local_io_output_filename = os.path.join(self.cache_dir, io_output_filename)
-
-        app_log.debug(
-            f"Downloading output file {io_output_filename} from S3 bucket "
-            f"{self.s3_bucket_name} to local path {local_io_output_filename}..."
-        )
-
-        await self._download_file_from_s3(
-            self.s3_bucket_name, io_output_filename, local_io_output_filename
-        )
-
-        # stdout, stderr, traceback_str, exception_class_name
-        return await _execute_partial_in_threadpool(
-            partial(_load_json_file, local_io_output_filename)
-        )
-
-    async def query_result(self, task_metadata: Dict) -> Tuple[Any, str, str]:
-        """Query and retrieve a completed job's result.
-
-        Args:
-            task_metadata: Dictionary containing the task dispatch_id and node_id
-
-        Returns:
-            result, stdout, stderr
-        """
-
-        dispatch_id = task_metadata["dispatch_id"]
-        node_id = task_metadata["node_id"]
-
-        # Download result file from S3.
-        result = await self._download_result(dispatch_id, node_id)
-
-        # Download the task output data file from S3.
-        stdout, stderr = (await self._download_io_output(dispatch_id, node_id))[:2]
-
-        return result, stdout, stderr
+    def get_upload_uri(self, task_group_metadata: Dict, object_key: str) -> str:
+        dispatch_id = task_group_metadata["dispatch_id"]
+        gid = task_group_metadata["task_group_id"]
+        s3_object_key = f"{dispatch_id}/uploads/{gid}/{object_key}"
+        s3_bucket_name = self.s3_bucket_name
+        return f"s3://{s3_bucket_name}/{s3_object_key}"
