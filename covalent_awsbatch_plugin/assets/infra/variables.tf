@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-variable "suffix" {
+variable "prefix" {
   default     = ""
-  description = "suffix used for the AWS Resources created for the executor"
+  description = "prefix used for the AWS Resources created for the executor"
 }
 variable "aws_region" {
   default     = "us-east-1"

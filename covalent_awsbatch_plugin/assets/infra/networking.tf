@@ -21,7 +21,7 @@ resource "aws_default_subnet" "default" {
 }
 
 resource "aws_security_group" "sg" {
-  name        = local.suffix
+  name        = local.prefix
   description = "Allow traffic to Covalent server"
   vpc_id      = local.vpc_id
 
