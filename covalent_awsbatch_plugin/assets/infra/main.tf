@@ -27,8 +27,7 @@ resource "random_string" "default_suffix" {
 }
 
 locals {
-  suffix = var.suffix == "" ? random_string.default_suffix.result : var.suffix
-
+  suffix    = var.suffix == "" ? random_string.default_suffix.result : var.suffix
   vpc_id    = var.vpc_id == "" ? aws_default_vpc.default.id : var.vpc_id
   subnet_id = var.subnet_id == "" ? aws_default_subnet.default.id : var.subnet_id
 }
@@ -62,6 +61,7 @@ resource "aws_batch_job_queue" "job_queue" {
   name     = "queue-${local.suffix}"
   state    = "ENABLED"
   priority = 1
+
   compute_environments = [
     aws_batch_compute_environment.compute_environment.arn
   ]
