@@ -17,7 +17,7 @@
 resource "aws_default_vpc" "default" {}
 
 resource "aws_default_subnet" "default" {
-  availability_zone = "${var.aws_region}${var.aws_zone}"
+  availability_zone = "${local.region}${var.aws_zone}"
 }
 
 resource "aws_security_group" "sg" {

@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-provider "aws" {
-  region = var.aws_region
-}
+provider "aws" {}
+
+data "aws_region" "current" {}
 
 resource "random_string" "default_prefix" {
   length  = 9
@@ -25,11 +25,12 @@ resource "random_string" "default_prefix" {
 }
 
 locals {
-  prefix    = var.prefix == "" ? random_string.default_prefix.result : var.prefix
-  vpc_id    = var.vpc_id == "" ? aws_default_vpc.default.id : var.vpc_id
-  subnet_id = var.subnet_id == "" ? aws_default_subnet.default.id : var.subnet_id
+  prefix      = var.prefix == "" ? random_string.default_prefix.result : var.prefix
+  vpc_id      = var.vpc_id == "" ? aws_default_vpc.default.id : var.vpc_id
+  subnet_id   = var.subnet_id == "" ? aws_default_subnet.default.id : var.subnet_id
   credentials = var.credentials == "" ? pathexpand("~/.aws/credentials") : var.credentials
-  profile = var.profile == "" ? "default" : var.profile
+  profile     = var.profile == "" ? "default" : var.profile
+  region      = var.region == "" ? data.aws_region.current.name : var.region
 }
 
 resource "aws_s3_bucket" "bucket" {
@@ -83,7 +84,7 @@ resource "local_file" "rest_api_openapi_spec" {
   content = templatefile("${path.module}/awsbatch.conf.tftpl", {
     credentials               = local.credentials
     profile                   = local.profile
-    region                    = var.aws_region
+    region                    = local.region
     s3_bucket_name            = aws_s3_bucket.bucket.id
     batch_queue               = aws_batch_job_queue.job_queue.name
     batch_execution_role_name = aws_iam_role.ecs_tasks_execution_role.name

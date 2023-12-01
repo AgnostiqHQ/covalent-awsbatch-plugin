@@ -18,8 +18,8 @@ variable "prefix" {
   default     = ""
   description = "prefix used for the AWS Resources created for the executor"
 }
-variable "aws_region" {
-  default     = "us-east-1"
+variable "region" {
+  default     = ""
   description = "Region in which Covalent is deployed"
 }
 
