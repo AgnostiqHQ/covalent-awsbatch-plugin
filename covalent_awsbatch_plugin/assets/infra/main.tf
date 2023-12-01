@@ -30,6 +30,8 @@ locals {
   prefix    = var.prefix == "" ? random_string.default_prefix.result : var.prefix
   vpc_id    = var.vpc_id == "" ? aws_default_vpc.default.id : var.vpc_id
   subnet_id = var.subnet_id == "" ? aws_default_subnet.default.id : var.subnet_id
+  credentials = var.credentials == "" ? pathexpand("~/.aws/credentials") : var.credentials
+  profile = var.profile == "" ? "default" : var.profile
 }
 
 resource "aws_s3_bucket" "bucket" {
@@ -81,8 +83,8 @@ resource "aws_cloudwatch_log_stream" "log_stream" {
 resource "local_file" "rest_api_openapi_spec" {
   filename = "${path.module}/awsbatch.conf"
   content = templatefile("${path.module}/awsbatch.conf.tftpl", {
-    credentials               = var.credentials
-    profile                   = var.profile
+    credentials               = local.credentials
+    profile                   = local.profile
     region                    = var.aws_region
     s3_bucket_name            = aws_s3_bucket.bucket.id
     batch_queue               = aws_batch_job_queue.job_queue.name
