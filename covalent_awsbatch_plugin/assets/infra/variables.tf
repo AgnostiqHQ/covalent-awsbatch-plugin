@@ -72,13 +72,13 @@ variable "vpc_cidr" {
 # Executor missing configuration
 variable "credentials" {
   type        = string
-  default     = pathexpand("~/.aws/credentials")
+  default     = ""
   description = "Path to the AWS shared configuration file"
 }
 
 variable "profile" {
   type        = string
-  default     = "default"
+  default     = ""
   description = "AWS profile used during execution"
 }
 
