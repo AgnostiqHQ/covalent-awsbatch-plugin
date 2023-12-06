@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+## [0.42.0] - 2023-12-06
+
 ### Changed
 
 - Edit terraform scripts to require no user input in most cases (maybe `region`).
