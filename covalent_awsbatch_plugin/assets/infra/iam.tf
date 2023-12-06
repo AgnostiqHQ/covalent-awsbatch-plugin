@@ -1,3 +1,21 @@
+# Copyright 2021 Agnostiq Inc.
+#
+# This file is part of Covalent.
+#
+# Licensed under the Apache License 2.0 (the "License"). A copy of the
+# License may be obtained with this software package or at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Use of this file is prohibited except in compliance with the License.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+data "aws_caller_identity" "current" {}
+
 data "aws_iam_policy_document" "assume_role_policy" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -10,7 +28,7 @@ data "aws_iam_policy_document" "assume_role_policy" {
 }
 
 resource "aws_iam_role" "ecs_tasks_execution_role" {
-  name               = "${var.prefix}-task-execution-role"
+  name               = "covalent-${local.prefix}-task-execution-role"
   assume_role_policy = data.aws_iam_policy_document.assume_role_policy.json
 }
 
@@ -25,13 +43,12 @@ resource "aws_iam_role_policy_attachment" "ecs_instance_role" {
 }
 
 resource "aws_iam_instance_profile" "ecs_instance_role" {
-  name = "${var.prefix}-instance-profile"
+  name = "covalent-${local.prefix}-instance-profile"
   role = aws_iam_role.ecs_instance_role.name
 }
 
-
 resource "aws_iam_role" "ecs_instance_role" {
-  name = "${var.prefix}-instance-role"
+  name = "covalent-${local.prefix}-instance-role"
 
   assume_role_policy = jsonencode({
     "Version" : "2012-10-17",
@@ -48,7 +65,7 @@ resource "aws_iam_role" "ecs_instance_role" {
 }
 
 resource "aws_iam_role" "aws_batch_service_role" {
-  name = "${var.prefix}-service-role"
+  name = "covalent-${local.prefix}-service-role"
 
   assume_role_policy = jsonencode({
     "Version" : "2012-10-17",
@@ -70,7 +87,7 @@ resource "aws_iam_role_policy_attachment" "aws_batch_service_role_attachment" {
 }
 
 resource "aws_iam_role_policy" "job_policy" {
-  name = "${var.prefix}-job-policy"
+  name = "covalent-${local.prefix}-job-policy"
   role = aws_iam_role.job_role.id
 
   policy = jsonencode({
@@ -135,7 +152,7 @@ resource "aws_iam_role_policy" "job_policy" {
 }
 
 resource "aws_iam_role" "job_role" {
-  name = "${var.prefix}-job-role"
+  name = "covalent-${local.prefix}-job-role"
 
   assume_role_policy = jsonencode({
     "Version" : "2012-10-17",
