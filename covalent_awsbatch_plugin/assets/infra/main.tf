@@ -39,7 +39,7 @@ resource "aws_s3_bucket" "bucket" {
 }
 
 resource "aws_batch_compute_environment" "compute_environment" {
-  compute_environment_name = "compute-environment-${local.prefix}"
+  compute_environment_name = "covalent-${local.prefix}-compute-environment"
 
   compute_resources {
     instance_role = aws_iam_instance_profile.ecs_instance_role.arn
@@ -59,7 +59,7 @@ resource "aws_batch_compute_environment" "compute_environment" {
   depends_on   = [aws_iam_role_policy_attachment.aws_batch_service_role_attachment]
 }
 resource "aws_batch_job_queue" "job_queue" {
-  name     = "queue-${local.prefix}"
+  name     = "covalent-${local.prefix}-job-queue"
   state    = "ENABLED"
   priority = 1
 
@@ -69,11 +69,11 @@ resource "aws_batch_job_queue" "job_queue" {
 }
 
 resource "aws_cloudwatch_log_group" "log_group" {
-  name = "log-group-${local.prefix}"
+  name = "covalent-${local.prefix}-log-group"
 }
 
 resource "aws_cloudwatch_log_stream" "log_stream" {
-  name           = "log-stream-${local.prefix}"
+  name           = "covalent-${local.prefix}-log-stream"
   log_group_name = aws_cloudwatch_log_group.log_group.name
 }
 
