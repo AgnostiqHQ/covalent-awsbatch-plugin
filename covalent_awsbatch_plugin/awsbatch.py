@@ -283,6 +283,8 @@ class AWSBatchExecutor(AWSExecutor):
         ]
         COVALENT_SUMMARY_UPLOAD_URIS = json.dumps(summary_upload_uris)
 
+        S3_STAGING_PREFIX = f"s3://{self.s3_bucket_name}/{dispatch_id}/sublattice_staging"
+
         # Register the job definition
         jobDefinitionName = f"{dispatch_id}-{task_group_id}"
         self._debug_log(f"Registering job definition {jobDefinitionName}...")
@@ -306,6 +308,10 @@ class AWSBatchExecutor(AWSExecutor):
             {
                 "name": "COVALENT_SUMMARY_UPLOAD_URIS",
                 "value": COVALENT_SUMMARY_UPLOAD_URIS,
+            },
+            {
+                "name": "COVALENT_STAGING_URI_PREFIX",
+                "value": S3_STAGING_PREFIX,
             },
         ]
         app_log.debug("Job Environment:")
