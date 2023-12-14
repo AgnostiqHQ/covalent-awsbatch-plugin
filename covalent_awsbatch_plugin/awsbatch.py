@@ -316,6 +316,7 @@ class AWSBatchExecutor(AWSExecutor):
         ]
         app_log.debug("Job Environment:")
         app_log.debug(env)
+        app_log.debug(f"Log group name {self.log_group_name}")
         partial_func = partial(
             batch.register_job_definition,
             jobDefinitionName=jobDefinitionName,
@@ -475,27 +476,42 @@ class AWSBatchExecutor(AWSExecutor):
                 resp = s3.get_object(Bucket=self.s3_bucket_name, Key=summary_filename)
                 result_summary = json.loads(resp["Body"].read())
                 status = RESULT_STATUS.FAILED if result_summary["exception_occurred"] else RESULT_STATUS.COMPLETED
-                assets = {
-                    "output": {
-                        "remote_uri": result_summary["output_uri"],
-                    },
-                    "stdout": {
-                        "remote_uri": result_summary["stdout_uri"],
-                    },
-                    "stderr": {
-                        "remote_uri": result_summary["stderr_uri"],
-                    },
-                    "qelectron_db": {
-                        "remote_uri": result_summary["qelectron_db_uri"],
-                    },
-                }
-                update = {
+                node_id = result_summary["node_id"]
+                output_uri = result_summary["output"]["uri"]
+                output_size = result_summary["output"]["size"]
+                stdout_uri = result_summary["stdout"]["uri"]
+                stdout_size = result_summary["stdout"]["size"]
+                stderr_uri = result_summary["stderr"]["uri"]
+                stderr_size = result_summary["stderr"]["size"]
+                qelectron_db_uri = result_summary["qelectron_db"]["uri"]
+                qelectron_db_size = result_summary["qelectron_db"]["size"]
+                exception_raised = result_summary["exception_occurred"]
+
+                task_result = {
                     "dispatch_id": dispatch_id,
                     "node_id": node_id,
                     "status": status,
-                    "assets": assets,
+                    "assets": {
+                        "output": {
+                            "remote_uri": output_uri,
+                            "size": output_size,
+                        },
+                        "stdout": {
+                            "remote_uri": stdout_uri,
+                            "size": stdout_size,
+                        },
+                        "stderr": {
+                            "remote_uri": stderr_uri,
+                            "size": stderr_size,
+                        },
+                        "qelectron_db": {
+                            "remote_uri": qelectron_db_uri,
+                            "size": qelectron_db_size,
+                        },
+                    },
                 }
-                task_updates.append(TaskUpdate(**update))
+
+                task_updates.append(TaskUpdate(**task_result))
 
             except s3.exceptions.NoSuchKey:
                 for j in range(i, len(task_group_metadata["node_ids"])):
